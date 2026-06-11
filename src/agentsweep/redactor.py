@@ -11,7 +11,12 @@ from pathlib import Path
 
 
 MIN_AGE_SECONDS = 60
-AUDIT_PATH = Path.home() / ".claude" / "agentsweep-audit.jsonl"
+
+
+def audit_path() -> Path:
+    # Resolved at call time, not import time, so tests that monkeypatch
+    # HOME/USERPROFILE never append to the user's real audit log.
+    return Path.home() / ".claude" / "agentsweep-audit.jsonl"
 
 
 class SafetyError(Exception):
@@ -162,8 +167,9 @@ def _validate_jsonl(content: str) -> None:
 
 def _append_audit(record: WriteRecord) -> None:
     try:
-        AUDIT_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with AUDIT_PATH.open("a", encoding="utf-8") as f:
+        target = audit_path()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("a", encoding="utf-8") as f:
             f.write(json.dumps({
                 "ts": datetime.now(timezone.utc).isoformat(),
                 "path": str(record.path),

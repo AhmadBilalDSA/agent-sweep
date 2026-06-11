@@ -9,7 +9,9 @@ CLAUDE_CODE_MARKERS: tuple[str, ...] = (
     "claude-code",
     "anthropic-ai/claude-code",
     "/claude ",
-    "\\claude.exe",
+    # Windows tasklist reports the bare image name ("claude.exe", no path),
+    # so the marker must not require a leading backslash.
+    "claude.exe",
     "claude.cmd",
     " claude ",
 )

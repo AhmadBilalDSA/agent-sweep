@@ -70,11 +70,12 @@ def main(argv: list[str] | None = None) -> int:
 
     files = source.files()
     if not files:
+        print(f"No history files found under {source.root}", file=sys.stderr)
         if args.json:
-            print(f"No history files found under {source.root}", file=sys.stderr)
+            print("[]")  # stdout must stay parseable JSON in every --json run
         else:
             ui.stage(1, "warn", "DISCOVER", source.name,
-                     f"no history files under {source.root}")
+                     f"no history files under {source.root}", err=True)
         return 0
 
     if args.json:
@@ -89,7 +90,8 @@ def main(argv: list[str] | None = None) -> int:
         found_by_file, strings_scanned = _scan_all(source, files)
     elapsed = time.perf_counter() - t0
 
-    ui.stage(2, "ok", "SCAN", f"{strings_scanned} string(s)", f"{elapsed:.1f}s")
+    ui.stage(2, "ok", "SCAN", f"{len(files)} file(s)",
+             f"{strings_scanned} string(s)", f"{elapsed:.1f}s")
 
     if not found_by_file:
         ui.stage(3, "ok", "FINDINGS", "no secrets found")
@@ -110,17 +112,33 @@ def main(argv: list[str] | None = None) -> int:
 
     gate_err = _preflight_gates(source, source_cls, args)
     if gate_err is not None:
+        # The user who most needs rotation guidance is the one we just
+        # refused to redact for — the keys are confirmed live.
+        ui.stage(5, "warn", "ROTATE", "these keys are still live")
+        ui.rotation_panel(_rotation_items(found_by_file))
         return gate_err
 
-    ui.stage(4, "ok", "REDACT", f"rewriting {len(found_by_file)} file(s)")
-    errors = _redact_all(
+    rows, errors = _redact_all(
         source=source,
         found_by_file=found_by_file,
         backup=not args.no_backup,
         force=args.force,
     )
 
-    ui.stage(5, "warn", "ROTATE", "redacted locally", "keys live until rotated")
+    ok_count = sum(1 for status, _, _ in rows if status == "ok")
+    if errors == 0:
+        ui.stage(4, "ok", "REDACT", f"{ok_count}/{len(rows)} file(s) rewritten")
+    elif ok_count:
+        ui.stage(4, "warn", "REDACT", f"{ok_count}/{len(rows)} file(s) rewritten")
+    else:
+        ui.stage(4, "fail", "REDACT", f"0/{len(rows)} file(s) rewritten")
+    for status, path_display, note in rows:
+        ui.redact_row(status, path_display, note)
+
+    if ok_count:
+        ui.stage(5, "warn", "ROTATE", "redacted locally", "keys live until rotated")
+    else:
+        ui.stage(5, "warn", "ROTATE", "nothing redacted", "these keys are still live")
     ui.rotation_panel(_rotation_items(found_by_file))
 
     return 0 if errors == 0 else 2
@@ -183,13 +201,20 @@ def _redact_all(
     found_by_file: dict,
     backup: bool,
     force: bool,
-) -> int:
+) -> tuple[list[tuple[str, str, str]], int]:
+    """Apply redactions, returning ((status, path_display, note) rows, error count).
+
+    Rows are collected rather than printed so the REDACT stage line can
+    report the real outcome (ok/partial/all-failed) above them.
+    """
+    rows: list[tuple[str, str, str]] = []
     errors = 0
     for path, items in found_by_file.items():
+        display = ui.rel(path, source.root)
         try:
             safety_check(path, source.root, force=force)
         except SafetyError as e:
-            ui.redact_row("skip", path, str(e))
+            rows.append(("skip", display, str(e)))
             errors += 1
             continue
 
@@ -198,14 +223,14 @@ def _redact_all(
             new_content = source.apply_redactions(path, redactions)
             record = safe_write(path, new_content, backup=backup)
             note = f".bak: {record.backup.name}" if record.backup else "no backup"
-            ui.redact_row("ok", path, note)
+            rows.append(("ok", display, note))
         except SafetyError as e:
-            ui.redact_row("fail", path, str(e))
+            rows.append(("fail", display, str(e)))
             errors += 1
         except Exception as e:
-            ui.redact_row("fail", path, f"{type(e).__name__}: {e}")
+            rows.append(("fail", display, f"{type(e).__name__}: {e}"))
             errors += 1
-    return errors
+    return rows, errors
 
 
 def _preflight_gates(source: Source, source_cls: type[Source], args) -> int | None:

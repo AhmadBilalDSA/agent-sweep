@@ -1,13 +1,18 @@
-"""Contract tests for the pipeline UI: --json purity, exit codes, masking."""
+"""Contract tests for the pipeline UI: --json purity, exit codes, masking,
+gate rendering, redact rows, and encoding degradation."""
 from __future__ import annotations
 
+import io
 import json
 import re
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from agentsweep import cli, ui  # noqa: E402
 from agentsweep.cli import main  # noqa: E402
 
 
@@ -20,12 +25,30 @@ FIXTURE_LINE = (
 ANSI_ESCAPE = re.compile(r"\x1b\[")
 
 
+@pytest.fixture(autouse=True)
+def _isolated_home(tmp_path, monkeypatch):
+    """Keep every test away from the real ~/.claude (audit log lives there)."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    return home
+
+
+@pytest.fixture
+def _no_claude(monkeypatch):
+    """Make the running-process gate deterministic (we test it explicitly)."""
+    monkeypatch.setattr(cli, "is_claude_code_running", lambda: (False, ""))
+
+
 def _mkroot(tmp_path: Path, content: str = FIXTURE_LINE) -> Path:
     root = tmp_path / "history"
     root.mkdir()
     (root / "session.jsonl").write_text(content, encoding="utf-8")
     return root
 
+
+# ---------------------------------------------------------------- json mode
 
 def test_json_mode_is_machine_clean(tmp_path, capsys):
     root = _mkroot(tmp_path)
@@ -48,6 +71,31 @@ def test_json_mode_clean_history_exits_zero(tmp_path, capsys):
     assert json.loads(out) == []
 
 
+def test_json_mode_empty_root_still_emits_json(tmp_path, capsys):
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    code = main(["--root", str(empty), "--json"])
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert json.loads(captured.out) == []
+    assert "No history files found" in captured.err
+
+
+def test_json_with_fix_is_scan_only(tmp_path, capsys):
+    """Pin inherited behavior: --json ignores --fix and never writes."""
+    root = _mkroot(tmp_path)
+    code = main(["--root", str(root), "--fix", "--force", "--json"])
+    out = capsys.readouterr().out
+
+    assert code == 1
+    assert json.loads(out)
+    assert AWS_KEY in (root / "session.jsonl").read_text(encoding="utf-8")
+    assert not (root / "session.jsonl.bak").exists()
+
+
+# ---------------------------------------------------------------- scan mode
+
 def test_scan_exit_codes(tmp_path, capsys):
     dirty = _mkroot(tmp_path)
     assert main(["--root", str(dirty)]) == 1
@@ -56,6 +104,16 @@ def test_scan_exit_codes(tmp_path, capsys):
     clean.mkdir()
     (clean / "s.jsonl").write_text('{"message":"hi"}\n', encoding="utf-8")
     assert main(["--root", str(clean)]) == 0
+
+
+def test_human_empty_root_notice_on_stderr(tmp_path, capsys):
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    code = main(["--root", str(empty)])
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert "No history files found" in captured.err  # old CLI's stream contract
 
 
 def test_human_output_pipeline_and_masking(tmp_path, capsys):
@@ -73,7 +131,69 @@ def test_human_output_pipeline_and_masking(tmp_path, capsys):
     assert GH_TOKEN not in out
 
 
-def test_fix_redacts_end_to_end_with_force(tmp_path, capsys):
+def test_bracketed_path_segments_survive_rendering(tmp_path, capsys):
+    """A Next.js-style `[id]` directory must not be eaten as rich markup."""
+    root = tmp_path / "history"
+    (root / "[id]").mkdir(parents=True)
+    (root / "[id]" / "s.jsonl").write_text(FIXTURE_LINE, encoding="utf-8")
+
+    code = main(["--root", str(root)])
+    out = capsys.readouterr().out
+
+    assert code == 1
+    assert "[id]" in out
+
+
+# ----------------------------------------------------------------- gates
+
+def test_production_gate_blocks_and_still_shows_rotation(
+        tmp_path, _isolated_home, capsys):
+    fake_root = _isolated_home / ".claude" / "projects"
+    fake_root.mkdir(parents=True)
+    (fake_root / "session.jsonl").write_text(FIXTURE_LINE, encoding="utf-8")
+
+    code = main(["--fix"])
+    captured = capsys.readouterr()
+
+    assert code == 2
+    assert "default production root" in captured.err
+    assert "--allow-production" in captured.err
+    # The blocked user still gets rotation guidance — keys are live.
+    assert "ACTION REQUIRED" in captured.out
+    assert "[5/5]" in captured.out
+
+
+def test_active_session_gate_blocks(tmp_path, monkeypatch, capsys):
+    root = _mkroot(tmp_path)
+    monkeypatch.setattr(cli, "is_claude_code_running",
+                        lambda: (True, "claude.exe"))
+
+    code = main(["--root", str(root), "--fix"])
+    captured = capsys.readouterr()
+
+    assert code == 2
+    assert "Claude Code appears to be running" in captured.err
+    assert "--force" in captured.err
+    assert "ACTION REQUIRED" in captured.out
+    assert AWS_KEY in (root / "session.jsonl").read_text(encoding="utf-8")
+
+
+def test_force_overrides_active_session_gate(tmp_path, monkeypatch, capsys):
+    root = _mkroot(tmp_path)
+    monkeypatch.setattr(cli, "is_claude_code_running",
+                        lambda: (True, "claude.exe"))
+
+    code = main(["--root", str(root), "--fix", "--force"])
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert "proceeding while Claude Code appears to be running" in captured.err
+    assert AWS_KEY not in (root / "session.jsonl").read_text(encoding="utf-8")
+
+
+# ----------------------------------------------------------------- redact
+
+def test_fix_redacts_end_to_end_with_force(tmp_path, _no_claude, capsys):
     root = _mkroot(tmp_path)
     code = main(["--root", str(root), "--fix", "--force"])
 
@@ -83,3 +203,71 @@ def test_fix_redacts_end_to_end_with_force(tmp_path, capsys):
     assert "[REDACTED:aws-access-key]" in content
     assert "[REDACTED:github-pat]" in content
     assert (root / "session.jsonl.bak").exists()
+
+
+def test_fix_write_error_shows_fail_row_and_exits_2(
+        tmp_path, _no_claude, capsys):
+    root = _mkroot(tmp_path)
+    # Pre-existing .bak makes safe_write refuse — exercises the FAIL row.
+    (root / "session.jsonl.bak").write_text("old", encoding="utf-8")
+
+    code = main(["--root", str(root), "--fix", "--force"])
+    captured = capsys.readouterr()
+
+    assert code == 2
+    assert "FAIL" in captured.err
+    assert "Backup already exists" in captured.err
+    assert "0/1 file(s) rewritten" in captured.out
+    assert AWS_KEY in (root / "session.jsonl").read_text(encoding="utf-8")
+
+
+def test_fix_no_backup(tmp_path, _no_claude, capsys):
+    root = _mkroot(tmp_path)
+    code = main(["--root", str(root), "--fix", "--force", "--no-backup"])
+    out = capsys.readouterr().out
+
+    assert code == 0
+    assert not (root / "session.jsonl.bak").exists()
+    assert "no backup" in out
+    assert AWS_KEY not in (root / "session.jsonl").read_text(encoding="utf-8")
+
+
+def test_fix_writes_audit_log_in_isolated_home(
+        tmp_path, _isolated_home, _no_claude, capsys):
+    root = _mkroot(tmp_path)
+    code = main(["--root", str(root), "--fix", "--force"])
+
+    assert code == 0
+    audit = _isolated_home / ".claude" / "agentsweep-audit.jsonl"
+    assert audit.exists()
+    record = json.loads(audit.read_text(encoding="utf-8").splitlines()[0])
+    assert record["path"].endswith("session.jsonl")
+
+
+# ------------------------------------------------------- encoding fallback
+
+def _console_with_encoding(encoding: str):
+    from rich.console import Console
+    stream = io.TextIOWrapper(io.BytesIO(), encoding=encoding)
+    # legacy_windows=False isolates the stream-encoding probe: on Windows,
+    # rich marks any non-terminal stream legacy, which forces ASCII anyway.
+    return Console(file=stream, highlight=False, legacy_windows=False)
+
+
+def test_ascii_fallback_on_cp1252_stream():
+    c = _console_with_encoding("cp1252")
+    assert ui._icons(c) == ui._ICONS_ASCII
+    from rich import box
+    assert ui._box(c, box.DOUBLE) is box.ASCII
+
+
+def test_unicode_icons_on_utf8_stream():
+    c = _console_with_encoding("utf-8")
+    assert ui._icons(c) == ui._ICONS_UNICODE
+
+
+def test_safe_escapes_unencodable_path_chars():
+    c = _console_with_encoding("cp1252")
+    # ✓ (U+2713) cannot encode to cp1252; printing it raw would crash.
+    assert "\\u2713" in ui._safe(c, "C:\\Users\\dev\\✓project\\s.jsonl")
+    assert ui._safe(c, "plain") == "plain"
