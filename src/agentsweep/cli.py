@@ -30,8 +30,19 @@ def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
     if not argv and _interactive():
-        return _menu()
+        try:
+            return _menu()
+        except KeyboardInterrupt:
+            ui.shutdown_notice()
+            return 130
+    try:
+        return _cli_run(argv)
+    except KeyboardInterrupt:
+        ui.shutdown_notice(during_fix="--fix" in argv, plain="--json" in argv)
+        return 130
 
+
+def _cli_run(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(
         prog="agentsweep",
         description="Find and redact secrets in AI coding agent histories.",
@@ -182,8 +193,12 @@ def _menu() -> int:
         ui.menu_options()
         try:
             choice = input("  > ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
+        except EOFError:
             print()
+            return 0
+        except KeyboardInterrupt:
+            print()
+            ui.shutdown_notice()
             return 0
 
         if choice == "1":

@@ -367,6 +367,54 @@ def test_menu_redact_confirmed_writes_and_undo_restores(
     assert not session.with_name("session.jsonl.bak").exists()
 
 
+# ------------------------------------------------------- graceful shutdown
+
+def _raise_interrupt(*args, **kwargs):
+    raise KeyboardInterrupt
+
+
+def test_ctrl_c_mid_scan_exits_130_no_traceback(tmp_path, monkeypatch, capsys):
+    root = _mkroot(tmp_path)
+    monkeypatch.setattr(cli, "_scan_all", _raise_interrupt)
+    code = main(["--root", str(root)])
+    captured = capsys.readouterr()
+
+    assert code == 130
+    assert "interrupted" in captured.err
+    assert "Traceback" not in captured.err
+
+
+def test_ctrl_c_during_fix_reassures_about_backups(
+        tmp_path, monkeypatch, _no_claude, capsys):
+    root = _mkroot(tmp_path)
+    monkeypatch.setattr(cli, "_redact_all", _raise_interrupt)
+    code = main(["--root", str(root), "--fix", "--force"])
+    captured = capsys.readouterr()
+
+    assert code == 130
+    assert "atomic" in captured.err
+    assert ".bak" in captured.err
+
+
+def test_ctrl_c_json_mode_keeps_stdout_clean(tmp_path, monkeypatch, capsys):
+    root = _mkroot(tmp_path)
+    monkeypatch.setattr(cli, "_scan_all", _raise_interrupt)
+    code = main(["--root", str(root), "--json"])
+    captured = capsys.readouterr()
+
+    assert code == 130
+    assert captured.out == ""  # nothing half-emitted on stdout
+    assert "interrupted" in captured.err
+
+
+def test_ctrl_c_at_menu_prompt_exits_gracefully(
+        monkeypatch, _isolated_home, capsys):
+    monkeypatch.setattr(cli, "_interactive", lambda: True)
+    monkeypatch.setattr("builtins.input", _raise_interrupt)
+    assert main([]) == 0
+    assert "interrupted" in capsys.readouterr().err
+
+
 # ------------------------------------------------------- encoding fallback
 
 def _console_with_encoding(encoding: str):
