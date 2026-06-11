@@ -34,19 +34,29 @@ AI coding assistants have created a new category of credential exposure that did
 
 ## Install
 
-```bash
-pip install agentsweep          # installs both `agentsweep` and `asweep` commands
-pip install --upgrade agentsweep  # update to latest
-```
-
-Or run without installing (via [uv](https://docs.astral.sh/uv/)):
+**Recommended — isolated, no venv conflicts, always works:**
 
 ```bash
-uvx agentsweep@latest           # always runs the newest version (bypasses cache)
-uvx asweep@latest               # short alias, always latest
+uv tool install agentsweep      # one-time install; adds `agentsweep` + `asweep` to PATH
+uv tool upgrade agentsweep      # update to latest
 ```
 
-Requires Python 3.11+. One dependency: [`rich`](https://github.com/Textualize/rich), for the pipeline terminal UI. Output degrades to plain text automatically when piped, and `--json` is always styling-free.
+**Run without installing (always latest, no cache issues):**
+
+```bash
+uvx agentsweep@latest
+uvx asweep@latest
+```
+
+**Classic pip:**
+
+```bash
+pip install agentsweep
+```
+
+> `uv` is a fast Python package manager — install it with `pip install uv` or from [astral.sh/uv](https://docs.astral.sh/uv/). `uv tool install` puts the command in its own isolated environment so it never conflicts with project venvs.
+
+Requires Python 3.11+.
 
 ## Usage
 
