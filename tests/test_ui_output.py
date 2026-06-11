@@ -305,8 +305,9 @@ def test_menu_folder_typo_then_retry_shows_count(
     (good / "s.jsonl").write_text(FIXTURE_LINE, encoding="utf-8")
 
     # 2 → typo (suggestion shown) → corrected path (count shown, scan runs)
-    # → Enter → 6 quit.
-    _feed_menu(monkeypatch, ["2", str(tmp_path / "histori"), str(good), "", "6"])
+    # → Enter skips the post-scan redaction offer → Enter → 6 quit.
+    _feed_menu(monkeypatch, ["2", str(tmp_path / "histori"), str(good), "", "",
+                             "6"])
     assert main([]) == 0
     captured = capsys.readouterr()
 
@@ -365,6 +366,52 @@ def test_menu_redact_confirmed_writes_and_undo_restores(
     restored = session.read_text(encoding="utf-8")
     assert restored == original  # undo brought the secret back, bak consumed
     assert not session.with_name("session.jsonl.bak").exists()
+
+
+# ----------------------------------------------------- post-scan redaction offer
+
+def test_post_scan_offer_declined_keeps_exit_1(tmp_path, monkeypatch, capsys):
+    root = _mkroot(tmp_path)
+    monkeypatch.setattr(cli, "_interactive", lambda: True)
+    prompts: list[str] = []
+    answers = iter([""])
+
+    def fake_input(prompt=""):
+        prompts.append(str(prompt))
+        return next(answers)
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    code = main(["--root", str(root)])
+
+    assert code == 1
+    assert any("REDACT" in p for p in prompts)  # the offer was made
+    assert AWS_KEY in (root / "session.jsonl").read_text(encoding="utf-8")
+
+
+def test_post_scan_offer_accepted_redacts(
+        tmp_path, monkeypatch, _no_claude, capsys):
+    root = _mkroot(tmp_path)
+    monkeypatch.setattr(cli, "_interactive", lambda: True)
+    # Fresh file trips the mtime gate, so the guided --force retry kicks in.
+    answers = iter(["REDACT", "y"])
+    monkeypatch.setattr("builtins.input", lambda *a: next(answers))
+
+    code = main(["--root", str(root)])
+
+    assert code == 0
+    content = (root / "session.jsonl").read_text(encoding="utf-8")
+    assert AWS_KEY not in content
+    assert (root / "session.jsonl.bak").exists()
+
+
+def test_json_mode_never_prompts(tmp_path, monkeypatch, capsys):
+    root = _mkroot(tmp_path)
+    monkeypatch.setattr(cli, "_interactive", lambda: True)
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda *a: (_ for _ in ()).throw(AssertionError("prompted in --json")),
+    )
+    assert main(["--root", str(root), "--json"]) == 1
 
 
 # ------------------------------------------------------- graceful shutdown

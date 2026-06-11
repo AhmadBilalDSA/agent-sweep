@@ -28,7 +28,8 @@ Requires Python 3.11+. One dependency: [`rich`](https://github.com/Textualize/ri
 
 Run with no arguments in a terminal and you get the full experience — banner,
 numbered menu, typed confirmations before anything destructive, and one-key
-undo (restores the `.bak` backups):
+undo (restores the `.bak` backups). Any interactive scan that finds secrets
+ends with an offer to redact them on the spot (type `REDACT` to confirm):
 
 ```
 agentsweep

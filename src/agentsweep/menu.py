@@ -90,23 +90,35 @@ def _ask_folder() -> Path | None:
 
 
 def _menu_redact() -> None:
-    from .cli import main
-
     ui.warn_line("This rewrites files under your Claude Code history in place.")
     ui.warn_line("Every file gets a .bak backup; option 4 can undo afterwards.")
+    _confirm_and_fix("claude-code", None)
+
+
+def _confirm_and_fix(source: str, root: Path | None) -> int | None:
+    """Typed-confirmation redaction with a guided --force retry.
+
+    Returns the fix run's exit code, or None if the user backed out.
+    """
+    from .cli import main
+
     try:
         typed = input("  type REDACT to confirm (anything else cancels): ").strip()
     except (EOFError, KeyboardInterrupt):
         print()
-        return
+        return None
     if typed != "REDACT":
         ui.warn_line("cancelled — nothing was written")
-        return
+        return None
 
-    code = main(["--fix", "--allow-production"])
+    argv = ["--source", source, "--fix", "--allow-production"]
+    if root is not None:
+        argv += ["--root", str(root)]
+    code = main(argv)
     if code != 2:
-        return
-    # A safety gate refused (most likely: Claude Code is running).
+        return code
+    # A safety gate refused (most likely: Claude Code is running, or the
+    # files were written moments ago).
     try:
         retry = input(
             "  a safety gate blocked the redaction (see above).\n"
@@ -115,9 +127,21 @@ def _menu_redact() -> None:
         ).strip().lower()
     except (EOFError, KeyboardInterrupt):
         print()
-        return
+        return code
     if retry == "y":
-        main(["--fix", "--allow-production", "--force"])
+        return main(argv + ["--force"])
+    return code
+
+
+def offer_redaction(args) -> int | None:
+    """Post-scan offer: the report just showed live secrets — fix them now.
+
+    Returns the fix run's exit code, or None if the user skipped.
+    """
+    print()
+    ui.warn_line("those keys are sitting in plain text — you can redact "
+                 "them right now (.bak backups kept)")
+    return _confirm_and_fix(args.source, args.root)
 
 
 def _menu_undo() -> None:

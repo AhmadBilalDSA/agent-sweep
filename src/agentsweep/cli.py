@@ -34,7 +34,17 @@ def main(argv: list[str] | None = None) -> int:
             return 130
     try:
         from .pipeline import run
-        return run(_parse(argv))
+        args = _parse(argv)
+        code = run(args)
+        # Scan-only run on a real terminal just showed live secrets:
+        # offer to redact them on the spot instead of making the user
+        # retype the command with --fix.
+        if code == 1 and not args.fix and not args.json and _interactive():
+            from .menu import offer_redaction
+            fixed = offer_redaction(args)
+            if fixed is not None:
+                return fixed
+        return code
     except KeyboardInterrupt:
         ui.shutdown_notice(during_fix="--fix" in argv, plain="--json" in argv)
         return 130
