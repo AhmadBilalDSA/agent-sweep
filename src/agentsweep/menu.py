@@ -112,6 +112,23 @@ def run_menu() -> int:
             return 0
 
 
+def _resolve_folder(raw: str) -> Path:
+    """Resolve a raw folder string to the best matching Path.
+
+    Resolution order:
+    1. expanduser  — handles ``~/Downloads``
+    2. home-relative — handles bare names like ``Downloads`` or ``Desktop``
+    3. original expanduser result — caller shows not-found error
+    """
+    p = Path(raw).expanduser()
+    if p.exists():
+        return p
+    home_relative = Path.home() / raw
+    if home_relative.exists():
+        return home_relative
+    return p  # let the caller handle the not-found case
+
+
 def _ask_folder() -> Path | None:
     """Prompt for a folder, forgivingly: suggest near-misses on typos,
     show the file count before scanning, allow up to 3 attempts."""
@@ -123,7 +140,7 @@ def _ask_folder() -> Path | None:
             return None
         if not raw:
             return None
-        path = Path(raw).expanduser()
+        path = _resolve_folder(raw)
         if path.exists():
             count = sum(1 for _ in path.rglob("*.jsonl"))
             print(f"  found {count} .jsonl file(s) under {path}")
@@ -137,6 +154,7 @@ def _ask_folder() -> Path | None:
                     continue
             return path
         ui.warn_line(f"path not found: {path}")
+        print(f"  hint: use a full path, e.g. C:\\Users\\yourname\\Downloads")
         for hint in _suggest_paths(path):
             print(f"    did you mean: {path.parent / hint}")
     return None
