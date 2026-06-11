@@ -49,7 +49,8 @@ def menu_options() -> None:
     grid.add_row("[5]", "Redact Claude Code history", "asks to confirm · .bak backups")
     grid.add_row("[6]", "Undo last redaction", "restores .bak backups")
     grid.add_row("[7]", "Findings as JSON", "read-only")
-    grid.add_row("[8]", "Quit", "")
+    grid.add_row("[8]", "Check for updates", "")
+    grid.add_row("[9]", "Quit", "")
     console.print(Padding(Panel(
         grid,
         title="MENU",

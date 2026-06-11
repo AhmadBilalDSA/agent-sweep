@@ -12,10 +12,40 @@ from __future__ import annotations
 
 import copy
 import os
+import threading
 from pathlib import Path
 
 from . import __version__, ui
 from .pipeline import _suggest_paths
+
+
+def _passive_update_check() -> None:
+    """Fire a background thread to check PyPI for a newer version.
+
+    If a newer version is found within ~1 second, print a dim yellow notice.
+    On timeout or any failure, print nothing.  The thread is daemonized so it
+    never blocks process exit.
+    """
+    from .cli import check_for_update
+
+    result: list[str | None] = [None]  # [latest_version]
+
+    def _fetch() -> None:
+        latest, err = check_for_update(timeout=2)
+        if err is None:
+            result[0] = latest
+
+    t = threading.Thread(target=_fetch, daemon=True)
+    t.start()
+    t.join(timeout=1.0)  # wait at most 1 s; if slower, skip notice
+
+    if not t.is_alive() and result[0] is not None:
+        from .cli import _version_tuple
+        if _version_tuple(result[0]) > _version_tuple(__version__):
+            ui.console.print(
+                f"  [dim yellow]update available: agentsweep {result[0]} — "
+                f"run: pip install --upgrade agentsweep[/dim yellow]"
+            )
 
 
 def run_menu() -> int:
@@ -27,6 +57,7 @@ def run_menu() -> int:
     if ui.console.is_terminal and not os.environ.get("AGENTSWEEP_NO_ANIM"):
         ui.console.clear()
     ui.big_banner(__version__)
+    _passive_update_check()
     while True:
         ui.menu_options()
         try:
@@ -55,10 +86,23 @@ def run_menu() -> int:
             main(["undo", "--source", "claude-code"])
         elif choice == "7":
             main(["scan", "--source", "claude-code", "--json"])
-        elif choice in {"8", "q", "quit", "exit"}:
+        elif choice == "8":
+            from .cli import check_for_update, _version_tuple
+            print("  checking for updates…")
+            latest, err = check_for_update(timeout=5)
+            if err is not None:
+                ui.warn_line(f"could not reach PyPI — {err}")
+            elif _version_tuple(latest) > _version_tuple(__version__):
+                print(
+                    f"  agentsweep {latest} is available — run: "
+                    f"pip install --upgrade agentsweep"
+                )
+            else:
+                print(f"  agentsweep {__version__} is up to date")
+        elif choice in {"9", "q", "quit", "exit"}:
             return 0
         else:
-            ui.warn_line(f"unknown option: {choice!r} — pick 1-8")
+            ui.warn_line(f"unknown option: {choice!r} — pick 1-9")
             continue
 
         try:

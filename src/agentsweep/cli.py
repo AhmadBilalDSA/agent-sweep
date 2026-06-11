@@ -7,6 +7,7 @@ Usage shapes, all supported:
     agentsweep fix  [opts]     redact (guided + confirmed on a terminal)
     agentsweep undo [opts]     restore .bak backups
     agentsweep --fix ...       legacy flag form, kept working as an alias
+    agentsweep --update        check PyPI for a newer version
 
 Run logic lives in pipeline.py; interaction in menu.py.
 """
@@ -20,6 +21,49 @@ from . import __version__, ui
 from .sources import SOURCES
 
 VERBS = {"scan", "fix", "undo"}
+
+_PYPI_URL = "https://pypi.org/pypi/agentsweep/json"
+
+
+def check_for_update(timeout: int = 2) -> tuple[str | None, str | None]:
+    """Return (latest_version, error_message).
+
+    Fetches PyPI metadata synchronously.  On any failure returns
+    (None, error_string) so the caller can decide whether to surface it.
+    """
+    import json
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(_PYPI_URL, timeout=timeout) as resp:
+            data = json.loads(resp.read())
+        return data["info"]["version"], None
+    except Exception as exc:  # network error, JSON error, key error, …
+        return None, str(exc)
+
+
+def _version_tuple(v: str) -> tuple[int, ...]:
+    """Convert "1.2.3" to (1, 2, 3) for numeric comparison."""
+    try:
+        return tuple(int(x) for x in v.split(".") if x.isdigit())
+    except Exception:
+        return (0,)
+
+
+def _run_update_check() -> int:
+    """Implement the --update flag: print result, return exit code."""
+    latest, err = check_for_update()
+    if err is not None:
+        print(f"  warning: could not reach PyPI — {err}", file=sys.stderr)
+        return 0
+    if _version_tuple(latest) > _version_tuple(__version__):
+        print(
+            f"  agentsweep {latest} is available — run: "
+            f"pip install --upgrade agentsweep"
+        )
+    else:
+        print(f"  agentsweep {__version__} is up to date")
+    return 0
 
 
 def _interactive() -> bool:
@@ -37,6 +81,9 @@ def main(argv: list[str] | None = None) -> int:
     if argv and argv[0] in ("-V", "--version"):
         print(f"agentsweep {__version__}")
         return 0
+
+    if argv and argv[0] in ("--update",):
+        return _run_update_check()
 
     if not argv and _interactive():
         from .menu import run_menu
