@@ -435,26 +435,106 @@ def mask(secret: str) -> str:
 # rule can match contains it), so we skip the regex entirely when none of
 # the keyword's literals appear — provably lossless, and the per-rule
 # fixture tests fail loudly if a prefilter ever over-skips.
-_CONTEXT_SIG = re.compile(r"\{0,50\}\?\(\?:")
+# The lazy provider-context gap, e.g. `[\w.-]{0,50}?`. What follows it is
+# the mandatory keyword — either a `(?:a|b)` group or a bare literal.
+_GAP_SIG = re.compile(r"\{0,\d+\}\?")
+
+
+_LIT_CHARS = set(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-:/@~=")
+_FLAG_GROUP = re.compile(r"^\(\?[aiLmsux]+\)")
+_SCOPED_FLAG = re.compile(r"^\(\?[aiLmsux]+:")
 
 
 def _prefilter_literals(pattern: str) -> tuple[str, ...]:
-    """Extract any-of keyword literals from a context rule, or () if none.
+    """A required-substring set for a rule: a match implies at least one is
+    present, so the regex can be skipped when none appear. Context rules
+    use the keyword after the lazy gap; everything else uses the literal
+    the pattern is anchored on. Returns () (always run) when nothing safe
+    can be extracted. Losslessness is enforced by the per-rule fixture
+    tests — a wrong literal makes that rule's fixture undetectable."""
+    ctx = _context_literals(pattern)
+    if ctx:
+        return ctx
+    return _leading_literals(pattern)
 
-    Returns lowercase literals such that a match implies at least one is
-    present. Only the leading mandatory [A-Za-z] run of each top-level
-    alternative is used (anything before a quantifier/class/group is
-    guaranteed to appear verbatim)."""
-    m = _CONTEXT_SIG.search(pattern)
+
+def _context_literals(pattern: str) -> tuple[str, ...]:
+    m = _GAP_SIG.search(pattern)
     if not m:
         return ()
-    i = m.end()  # just past "(?:"
-    depth = 1
-    group = []
-    while i < len(pattern) and depth:
-        c = pattern[i]
+    rest = pattern[m.end():]
+    if rest[:3] == "(?:" or (rest[:1] == "(" and rest[:2] != "(?"):
+        body, _ = _read_group(rest, 0)
+        return _alts_to_literals(body) if body is not None else ()
+    lit = _literal_run(rest)
+    return (lit.lower(),) if len(lit) >= 3 else ()
+
+
+def _leading_literals(pattern: str) -> tuple[str, ...]:
+    """Literal(s) the pattern must start with, after stripping flags/anchors."""
+    s = _FLAG_GROUP.sub("", pattern, count=1)
+    while True:
+        if s[:2] in ("\\b", "\\B", "\\A"):
+            s = s[2:]
+            continue
+        if s[:1] == "^":
+            s = s[1:]
+            continue
+        sm = _SCOPED_FLAG.match(s)
+        if sm:
+            s = s[sm.end():]
+            continue
+        break
+    if s[:3] == "(?:" or (s[:1] == "(" and s[:2] != "(?"):
+        body, _ = _read_group(s, 0)
+        return _alts_to_literals(body) if body is not None else ()
+    lit = _literal_run(s)
+    return (lit.lower(),) if len(lit) >= 3 else ()
+
+
+def _alts_to_literals(body: str) -> tuple[str, ...]:
+    lits: list[str] = []
+    for alt in _split_top_level(body):
+        lit = _literal_run(alt)
+        if len(lit) < 3:
+            return ()  # an alternative has no safe anchor — don't prefilter
+        lits.append(lit.lower())
+    return tuple(dict.fromkeys(lits))
+
+
+def _literal_run(s: str) -> str:
+    """Leading run of guaranteed-literal characters (escapes like \\. count)."""
+    out: list[str] = []
+    i = 0
+    while i < len(s):
+        c = s[i]
         if c == "\\":
-            group.append(pattern[i:i + 2])
+            nxt = s[i + 1] if i + 1 < len(s) else ""
+            if nxt and nxt in ".-_/+*?()[]{}|^$@~=":
+                out.append(nxt)
+                i += 2
+                continue
+            break  # \d \w \s \b ... — not a literal
+        if c in _LIT_CHARS:
+            out.append(c)
+            i += 1
+            continue
+        break
+    return "".join(out)
+
+
+def _read_group(s: str, open_idx: int) -> tuple[str | None, int]:
+    """Body and end index of the (...) group starting at s[open_idx] == '('."""
+    i = open_idx + 1
+    if s[i:i + 2] == "?:":
+        i += 2
+    depth = 1
+    body: list[str] = []
+    while i < len(s):
+        c = s[i]
+        if c == "\\":
+            body.append(s[i:i + 2])
             i += 2
             continue
         if c == "(":
@@ -462,17 +542,10 @@ def _prefilter_literals(pattern: str) -> tuple[str, ...]:
         elif c == ")":
             depth -= 1
             if depth == 0:
-                break
-        group.append(c)
+                return "".join(body), i + 1
+        body.append(c)
         i += 1
-    body = "".join(group)
-    lits: list[str] = []
-    for alt in _split_top_level(body):
-        run = re.match(r"[A-Za-z]{3,}", alt)
-        if not run:
-            return ()  # an alt has no safe literal — don't prefilter at all
-        lits.append(run.group().lower())
-    return tuple(dict.fromkeys(lits))
+    return None, i
 
 
 def _split_top_level(body: str) -> list[str]:

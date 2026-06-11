@@ -56,15 +56,19 @@ def test_prefilter_literals_are_truly_present_in_fixtures():
             f"{rule_id}: fixture lacks any prefilter literal {kws}"
 
 
-def test_prefilter_only_covers_context_rules():
-    # Anchored-prefix rules (glpat-, dop_v1_, AKIA...) don't need gating and
-    # must not be accidentally swept in with a bogus literal.
-    assert "aws-access-key" not in _PREFILTER
-    assert "gitlab-pat" not in _PREFILTER
-    # ...but the slow context rules are gated.
-    assert "jfrog-api-key" in _PREFILTER
+def test_prefilter_covers_anchored_and_context_rules():
+    # Anchored-prefix rules are now gated on their literal anchor too, so a
+    # giant non-secret string skips ~all 189 regexes via cheap substring
+    # checks instead of full regex passes.
+    assert _PREFILTER.get("aws-access-key") == ("akia",)
+    assert _PREFILTER.get("github-pat") == ("ghp_",)
+    assert _PREFILTER.get("gitlab-pat") == ("glpat-",)
+    # Context rules keep their any-of provider keywords.
     assert set(_PREFILTER["jfrog-api-key"]) == {
         "jfrog", "artifactory", "bintray", "xray"}
+    # Most of the 189 rules now have an anchor; the few without one (short or
+    # non-literal leads) simply always run — still correct.
+    assert len(_PREFILTER) > 150
 
 
 def test_prefilter_does_not_change_findings():
