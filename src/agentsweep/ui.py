@@ -7,10 +7,13 @@ this module, so its output stays machine-clean.
 from __future__ import annotations
 
 import contextlib
+import os
+import time
 from pathlib import Path
 
 from rich import box
-from rich.console import Console
+from rich.console import Console, Group
+from rich.live import Live
 from rich.padding import Padding
 from rich.panel import Panel
 from rich.table import Table
@@ -96,18 +99,97 @@ _FONT = {
 _GRADIENT = ["red", "red", "dark_orange", "orange1", "yellow"]
 
 
-def big_banner(version: str) -> None:
-    """Full-size two-line AGENT / SWEEP banner for interactive mode."""
+def _banner_rows() -> tuple[list[str], list[str]]:
+    """Render AGENT / SWEEP as (lines, per-line styles).
+
+    Cells are doubled to 2 chars wide when the terminal allows — block
+    glyphs are ~1:2, so doubling makes the letters read as solid squares.
+    """
     fill = "█" if _encodes(console, "█") else "#"
-    console.print()
+    cell_w = 2 if console.width >= 70 else 1
+    lines: list[str] = []
+    styles: list[str] = []
     for word in ("AGENT", "SWEEP"):
         for r in range(5):
-            line = " ".join(_FONT[ch][r] for ch in word)
-            console.print(Text("   " + line.replace("#", fill),
-                               style=f"bold {_GRADIENT[r]}"))
-        console.print()
-    console.print(Text(f"   secret scanner for AI agent histories — v{version}",
-                       style="dim"))
+            row = " ".join(_FONT[ch][r] for ch in word)
+            row = "".join(c * cell_w for c in row).replace("#", fill)
+            lines.append(row)
+            styles.append(f"bold {_GRADIENT[r]}")
+        lines.append("")
+        styles.append("")
+    return lines[:-1], styles[:-1]  # drop the trailing blank
+
+
+def _banner_frame(
+    lines: list[str],
+    styles: list[str],
+    width: int,
+    tagline: str,
+    beam: int | None = None,
+    glint: int | None = None,
+    tag_chars: int | None = None,
+) -> Group:
+    """One animation frame: reveal up to `beam`, white bar at the beam,
+    optional `glint` highlight pass, tagline typed up to `tag_chars`."""
+    bar = "█" if _encodes(console, "█") else "#"
+    rendered: list[Text] = [Text()]
+    for line, style in zip(lines, styles):
+        t = Text("   ")
+        padded = line.ljust(width)
+        for c, ch in enumerate(padded):
+            if beam is not None and beam <= c < beam + 2:
+                t.append(bar, style="bold white")
+            elif beam is None or c < beam:
+                if glint is not None and glint <= c < glint + 3 and ch != " ":
+                    t.append(ch, style="bold white")
+                else:
+                    t.append(ch, style=style)
+            else:
+                t.append(" ")
+        rendered.append(t)
+    rendered.append(Text())
+    shown = tagline if tag_chars is None else tagline[:tag_chars]
+    tag = Text(f"   {shown}", style="dim")
+    if tag_chars is not None and tag_chars < len(tagline):
+        tag.append(bar, style="bold red")
+    rendered.append(tag)
+    rendered.append(Text())
+    return Group(*rendered)
+
+
+def _animate_banner(lines: list[str], styles: list[str], tagline: str) -> None:
+    width = max(len(line) for line in lines)
+    with Live(console=console, refresh_per_second=60, transient=False) as live:
+        # Pass 1: the sweep — a bright bar wipes across, revealing letters.
+        for beam in range(0, width + 4, 3):
+            live.update(_banner_frame(lines, styles, width, tagline, beam=beam))
+            time.sleep(0.014)
+        # Pass 2: a quick glint over the finished letters.
+        for glint in range(0, width + 4, 4):
+            live.update(_banner_frame(lines, styles, width, tagline, glint=glint))
+            time.sleep(0.010)
+        # Pass 3: the tagline types itself out.
+        for i in range(0, len(tagline) + 2, 2):
+            live.update(_banner_frame(lines, styles, width, tagline,
+                                      tag_chars=min(i, len(tagline))))
+            time.sleep(0.012)
+        live.update(_banner_frame(lines, styles, width, tagline))
+
+
+def big_banner(version: str) -> None:
+    """Full-size AGENT / SWEEP banner; animated scanner-sweep on real
+    terminals, static art on pipes/CI or with AGENTSWEEP_NO_ANIM set."""
+    lines, styles = _banner_rows()
+    tagline = f"secret scanner for AI agent histories — v{version}"
+    if console.is_terminal and not os.environ.get("AGENTSWEEP_NO_ANIM"):
+        with contextlib.suppress(KeyboardInterrupt):
+            _animate_banner(lines, styles, tagline)
+            return
+    console.print()
+    for line, style in zip(lines, styles):
+        console.print(Text("   " + line, style=style))
+    console.print()
+    console.print(Text(f"   {tagline}", style="dim"))
     console.print()
 
 
