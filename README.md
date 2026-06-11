@@ -5,7 +5,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/Ishannaik/agent-sweep)
-[![No runtime deps](https://img.shields.io/badge/dependencies-zero-brightgreen.svg)](pyproject.toml)
 
 **Status:** alpha. Works on Claude Code today. Codex, Aider, Cursor, Continue via contributed `Source` adapters — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -21,7 +20,7 @@ Claude Code (and every other AI coding CLI) stores your full conversation histor
 pip install agentsweep
 ```
 
-Requires Python 3.10+. No runtime dependencies.
+Requires Python 3.10+. One dependency: [`rich`](https://github.com/Textualize/rich), for the pipeline terminal UI. Output degrades to plain text automatically when piped, and `--json` is always styling-free.
 
 ## Usage
 

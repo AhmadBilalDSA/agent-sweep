@@ -22,7 +22,7 @@ classifiers = [
     "Topic :: Security",
     "Topic :: Software Development",
 ]
-dependencies = []
+dependencies = ["rich>=13.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
