@@ -14,7 +14,10 @@ Run logic lives in pipeline.py; interaction in menu.py.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+import threading
+import urllib.request
 from pathlib import Path
 
 from . import __version__, ui
@@ -31,9 +34,6 @@ def check_for_update(timeout: int = 2) -> tuple[str | None, str | None]:
     Fetches PyPI metadata synchronously.  On any failure returns
     (None, error_string) so the caller can decide whether to surface it.
     """
-    import json
-    import urllib.request
-
     try:
         with urllib.request.urlopen(_PYPI_URL, timeout=timeout) as resp:
             data = json.loads(resp.read())
@@ -48,6 +48,55 @@ def _version_tuple(v: str) -> tuple[int, ...]:
         return tuple(int(x) for x in v.split(".") if x.isdigit())
     except Exception:
         return (0,)
+
+
+def _background_update_notice(args: argparse.Namespace) -> None:
+    """Fire a background update check and print a notice before first output.
+
+    Starts a daemon thread that fetches PyPI with a 1.5 s timeout.  The main
+    thread waits at most 0.8 s for the result; if the thread hasn't finished
+    by then we proceed regardless (the thread is still a daemon so it won't
+    block process exit).
+
+    Skipped entirely when:
+    - ``args.json`` is True (machine-readable output must stay clean), or
+    - stdout is not a tty (piped / redirected).
+    """
+    # Guard: skip in non-interactive / machine-readable contexts.
+    try:
+        if getattr(args, "json", False):
+            return
+        if not sys.stdout.isatty():
+            return
+    except Exception:
+        return
+
+    done = threading.Event()
+    result: list[str | None] = [None]  # mutable box for thread result
+
+    def _fetch() -> None:
+        try:
+            with urllib.request.urlopen(_PYPI_URL, timeout=1.5) as resp:
+                data = json.loads(resp.read())
+            result[0] = data["info"]["version"]
+        except Exception:
+            pass
+        finally:
+            done.set()
+
+    t = threading.Thread(target=_fetch, daemon=True)
+    t.start()
+
+    # Wait up to 0.8 s for the background thread before proceeding.
+    done.wait(timeout=0.8)
+
+    latest = result[0]
+    if latest is not None and _version_tuple(latest) > _version_tuple(__version__):
+        # Print a single dim-yellow notice before any other output.
+        print(
+            f"\033[2;33m  ★ agentsweep {latest} available"
+            f" — pip install --upgrade agentsweep\033[0m"
+        )
 
 
 def _run_update_check() -> int:
@@ -101,6 +150,7 @@ def main(argv: list[str] | None = None) -> int:
             return undo(_parse_undo(rest))
 
         args = _parse_run(verb, rest)
+        _background_update_notice(args)
         from .pipeline import run
         from .menu import offer_redaction
 
