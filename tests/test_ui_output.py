@@ -244,6 +244,27 @@ def test_fix_writes_audit_log_in_isolated_home(
     assert record["path"].endswith("session.jsonl")
 
 
+# --------------------------------------------------------- path forgiveness
+
+def test_root_not_found_exits_2_with_suggestion(tmp_path, capsys):
+    (tmp_path / "history").mkdir()
+    code = main(["--root", str(tmp_path / "histori")])
+    captured = capsys.readouterr()
+
+    assert code == 2
+    assert "Path not found" in captured.err
+    assert "history" in captured.err  # typo suggestion
+
+
+def test_root_not_found_json_keeps_stdout_parseable(tmp_path, capsys):
+    code = main(["--root", str(tmp_path / "nope"), "--json"])
+    captured = capsys.readouterr()
+
+    assert code == 2
+    assert json.loads(captured.out) == []
+    assert "Path not found" in captured.err
+
+
 # ----------------------------------------------------------------- menu
 
 def _feed_menu(monkeypatch, answers: list[str]):
@@ -275,6 +296,37 @@ def test_menu_scan_action_then_quit(monkeypatch, _isolated_home, capsys):
     assert main([]) == 0
     captured = capsys.readouterr()
     assert "No history files found" in captured.err
+
+
+def test_menu_folder_typo_then_retry_shows_count(
+        tmp_path, monkeypatch, _isolated_home, capsys):
+    good = tmp_path / "history"
+    good.mkdir()
+    (good / "s.jsonl").write_text(FIXTURE_LINE, encoding="utf-8")
+
+    # 2 → typo (suggestion shown) → corrected path (count shown, scan runs)
+    # → Enter → 6 quit.
+    _feed_menu(monkeypatch, ["2", str(tmp_path / "histori"), str(good), "", "6"])
+    assert main([]) == 0
+    captured = capsys.readouterr()
+
+    assert "path not found" in captured.err
+    assert "did you mean" in captured.out
+    assert "found 1 .jsonl file(s)" in captured.out
+    assert "FINDINGS" in captured.out  # the scan actually ran
+
+
+def test_menu_empty_folder_offers_scan_anyway(
+        tmp_path, monkeypatch, _isolated_home, capsys):
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    # decline the scan-anyway offer twice more → _ask_folder gives up → menu → quit
+    _feed_menu(monkeypatch, ["2", str(empty), "n", str(empty), "n", str(empty),
+                             "n", "", "6"])
+    assert main([]) == 0
+    out = capsys.readouterr().out
+    assert "found 0 .jsonl file(s)" in out
+    assert "scan anyway?" not in out  # prompt text goes via input(), not stdout
 
 
 def test_menu_invalid_choice_reprompts(monkeypatch, _isolated_home, capsys):

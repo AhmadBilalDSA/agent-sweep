@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
 import os
 import sys
@@ -78,6 +79,14 @@ def main(argv: list[str] | None = None) -> int:
 
     source_cls = SOURCES[args.source]
     source: Source = source_cls(root=args.root) if args.root else source_cls()
+
+    if args.root is not None and not source.root.exists():
+        print(f"Path not found: {source.root}", file=sys.stderr)
+        for hint in _suggest_paths(source.root):
+            print(f"  did you mean: {source.root.parent / hint}", file=sys.stderr)
+        if args.json:
+            print("[]")  # stdout stays parseable JSON even on user error
+        return 2
 
     if not args.json:
         ui.banner(__version__)
@@ -177,13 +186,9 @@ def _menu() -> int:
         if choice == "1":
             main(["--source", "claude-code"])
         elif choice == "2":
-            try:
-                raw = input("  folder to scan: ").strip().strip('"')
-            except (EOFError, KeyboardInterrupt):
-                print()
-                return 0
-            if raw:
-                main(["--root", raw])
+            root = _ask_folder()
+            if root is not None:
+                main(["--root", str(root)])
         elif choice == "3":
             _menu_redact()
         elif choice == "4":
@@ -201,6 +206,48 @@ def _menu() -> int:
         except (EOFError, KeyboardInterrupt):
             print()
             return 0
+
+
+def _suggest_paths(missing: Path) -> list[str]:
+    """Typo forgiveness: close-matching sibling directory names."""
+    parent = missing.parent
+    try:
+        if not parent.exists():
+            return []
+        siblings = [p.name for p in parent.iterdir() if p.is_dir()]
+    except OSError:
+        return []
+    return difflib.get_close_matches(missing.name, siblings, n=3, cutoff=0.5)
+
+
+def _ask_folder() -> Path | None:
+    """Prompt for a folder, forgivingly: suggest near-misses on typos,
+    show the file count before scanning, allow up to 3 attempts."""
+    for _ in range(3):
+        try:
+            raw = input("  folder to scan: ").strip().strip('"')
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return None
+        if not raw:
+            return None
+        path = Path(raw).expanduser()
+        if path.exists():
+            count = sum(1 for _ in path.rglob("*.jsonl"))
+            print(f"  found {count} .jsonl file(s) under {path}")
+            if count == 0:
+                try:
+                    anyway = input("  scan anyway? [y/N]: ").strip().lower()
+                except (EOFError, KeyboardInterrupt):
+                    print()
+                    return None
+                if anyway != "y":
+                    continue
+            return path
+        ui.warn_line(f"path not found: {path}")
+        for hint in _suggest_paths(path):
+            print(f"    did you mean: {path.parent / hint}")
+    return None
 
 
 def _menu_redact() -> None:
