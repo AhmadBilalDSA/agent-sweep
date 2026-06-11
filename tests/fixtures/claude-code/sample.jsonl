@@ -1,0 +1,4 @@
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"hey can you deploy? my AWS key is AKIAIOSFODNN7EXAMPLE and secret is abc123"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"sure, I'll use the key"}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"also here's my github token ghp_1234567890abcdefghijklmnopqrstuvwxyz and openai sk-proj-abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJ"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"no secrets here just plain text"}]}}
