@@ -29,8 +29,8 @@ pip install --upgrade agentsweep  # update to latest
 Or run without installing (via [uv](https://docs.astral.sh/uv/)):
 
 ```bash
-uvx agentsweep
-uvx --from agentsweep asweep    # short alias
+uvx agentsweep@latest           # always runs the newest version (bypasses cache)
+uvx asweep@latest               # short alias, always latest
 ```
 
 Requires Python 3.11+. One dependency: [`rich`](https://github.com/Textualize/rich), for the pipeline terminal UI. Output degrades to plain text automatically when piped, and `--json` is always styling-free.
@@ -116,6 +116,17 @@ The patterns: AWS access keys, GitHub tokens (PAT/OAuth/App/fine-grained), Strip
 - Anything inside a binary/non-UTF-8 file.
 
 For deeper detection, run `gitleaks` or `trufflehog` alongside agentsweep — their rule packs are more exhaustive. agentsweep's value is the **agent-history-specific surface**, not the detection engine.
+
+## FAQ
+
+**Why does `uvx agentsweep` show an old version?**
+uvx caches tools locally. Use `uvx agentsweep@latest` to always run the newest version (recommended), or force a cache refresh with `uvx --reinstall agentsweep`.
+
+**Where is OpenCode in the menu?**
+OpenCode support was added in v0.1.1. Run `pip install --upgrade agentsweep` or `uvx agentsweep@latest` to get it.
+
+**Does agentsweep send my data anywhere?**
+No. It is fully offline — zero network calls during scanning or redacting. The only optional network call is the background update check, which only fetches the latest version number from PyPI.
 
 ## License
 
