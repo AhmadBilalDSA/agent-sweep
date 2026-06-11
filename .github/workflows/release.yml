@@ -1,3 +1,8 @@
+# PyPI Trusted Publisher (OIDC) — no stored token needed.
+# One-time setup at: https://pypi.org/manage/project/agentsweep/settings/publishing/
+#   Owner: Ishannaik  |  Repository: agent-sweep  |  Workflow: release.yml  |  Environment: pypi
+# Then: git tag v0.1.2 && git push --tags  → this workflow publishes automatically.
+
 name: Release
 
 on:
@@ -48,3 +53,5 @@ jobs:
 
       - name: Publish to PyPI (trusted publishing)
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
