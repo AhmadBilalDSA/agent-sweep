@@ -24,6 +24,14 @@ CODEX_MARKERS: tuple[str, ...] = (
     " codex ",
 )
 
+OPENCODE_MARKERS: tuple[str, ...] = (
+    "sst/opencode",
+    "/opencode ",
+    "opencode.exe",
+    "opencode.cmd",
+    " opencode ",
+)
+
 
 def is_agent_running(markers: tuple[str, ...]) -> tuple[bool, str]:
     """Best-effort detection of a running agent process by marker substrings.
