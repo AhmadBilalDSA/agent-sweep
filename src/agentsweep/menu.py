@@ -1,8 +1,10 @@
-"""Interactive mode: big banner + numbered actions.
+"""Interactive mode: TUI arrow-key menus (with a numbered fallback).
 
-Forgiveness & confirmation: nothing destructive runs without an explicit
-typed confirmation, backups are always kept, and undo restores them.
-Flags/pipes bypass this module entirely (see cli.main).
+Primary path (RAW_INPUT_AVAILABLE):
+  action_menu() → source_picker() → cli.main(["scan", "--source", X])
+
+Fallback (no tty / CI / dumb terminal):
+  The classic numbered prompt (1-16) so non-tty / piped users still work.
 
 Menu actions invoke cli.main with verb argv — zero duplicated logic, and
 every action inherits the pipeline UI, safety gates, and exit codes. The
@@ -28,7 +30,7 @@ def _passive_update_check() -> None:
     """
     from .cli import check_for_update
 
-    result: list[str | None] = [None]  # [latest_version]
+    result: list[str | None] = [None]
 
     def _fetch() -> None:
         latest, err = check_for_update(timeout=2)
@@ -37,27 +39,103 @@ def _passive_update_check() -> None:
 
     t = threading.Thread(target=_fetch, daemon=True)
     t.start()
-    t.join(timeout=1.0)  # wait at most 1 s; if slower, skip notice
+    t.join(timeout=1.0)
 
     if not t.is_alive() and result[0] is not None:
         from .cli import _version_tuple
         if _version_tuple(result[0]) > _version_tuple(__version__):
             ui.console.print(
                 f"  [dim yellow]update available: agentsweep {result[0]} — "
-                f"run: pip install --upgrade agentsweep[/dim yellow]"
+                f"run: uv tool upgrade agentsweep  (or: pip install --upgrade agentsweep)[/dim yellow]"
             )
 
 
 def run_menu() -> int:
     from .cli import main
+    from .ui.keys import RAW_INPUT_AVAILABLE
 
-    # Clear once on entry so the banner gets a clean canvas — but NOT between
-    # menu actions (you want your scan results to stay on screen), and never
-    # for flag/piped runs (that path doesn't reach here). Honors NO_ANIM.
     if ui.console.is_terminal and not os.environ.get("AGENTSWEEP_NO_ANIM"):
         ui.console.clear()
     ui.big_banner(__version__)
     _passive_update_check()
+
+    if RAW_INPUT_AVAILABLE:
+        return _run_tui_menu(main)
+    else:
+        return _run_numbered_menu(main)
+
+
+# ── TUI path ─────────────────────────────────────────────────────────────────
+
+def _run_tui_menu(main) -> int:
+    from .ui.picker import action_menu, source_picker
+
+    while True:
+        try:
+            action = action_menu()
+        except (KeyboardInterrupt, EOFError):
+            print()
+            ui.shutdown_notice()
+            return 0
+
+        if action is None or action == "quit":
+            return 0
+
+        if action == "scan":
+            try:
+                picks = source_picker()
+            except (KeyboardInterrupt, EOFError):
+                print()
+                continue
+            if picks is None:
+                continue  # user pressed Back
+            for name in picks:
+                if name == "__custom__":
+                    root = _ask_folder()
+                    if root is not None:
+                        main(["scan", "--root", str(root)])
+                else:
+                    main(["scan", "--source", name])
+            _pause()
+
+        elif action == "redact":
+            main(["fix", "--source", "claude-code"])
+            _pause()
+
+        elif action == "undo":
+            main(["undo", "--source", "claude-code"])
+            _pause()
+
+        elif action == "json":
+            main(["scan", "--source", "claude-code", "--json"])
+            _pause()
+
+        elif action == "updates":
+            from .cli import check_for_update, _version_tuple
+            print("  checking for updates…")
+            latest, err = check_for_update(timeout=5)
+            if err is not None:
+                ui.warn_line(f"could not reach PyPI — {err}")
+            elif _version_tuple(latest) > _version_tuple(__version__):
+                print(
+                    f"  agentsweep {latest} is available — run: "
+                    f"uv tool upgrade agentsweep  (or: pip install --upgrade agentsweep)"
+                )
+            else:
+                print(f"  agentsweep {__version__} is up to date")
+            _pause()
+
+
+def _pause() -> None:
+    try:
+        input("\n  press Enter for the menu...")
+    except (EOFError, KeyboardInterrupt):
+        print()
+
+
+# ── Numbered fallback (non-tty / CI / dumb terminal) ─────────────────────────
+
+def _run_numbered_menu(main) -> int:
     while True:
         ui.menu_options()
         try:
@@ -126,6 +204,8 @@ def run_menu() -> int:
             return 0
 
 
+# ── Shared helpers ────────────────────────────────────────────────────────────
+
 def _ask_folder() -> Path | None:
     """Prompt for a folder, forgivingly: suggest near-misses on typos,
     show the file count before scanning, allow up to 3 attempts."""
@@ -180,7 +260,6 @@ def offer_redaction(args) -> int | None:
 
     fix_args = copy.copy(args)
     fix_args.fix = True
-    # A typed, interactive confirmation IS the alpha-stage opt-in.
     fix_args.allow_production = True
     code = run(fix_args)
     if code == 2 and not fix_args.force:

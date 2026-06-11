@@ -9,6 +9,7 @@ import difflib
 import json
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from . import __version__, ui
@@ -178,6 +179,44 @@ def _scan(source, files, ignores, progress=None):
                      on_file=_on_file, on_finding=_on_finding)
 
 
+def _scan_file(
+    source: Source,
+    f: Path,
+    ignores,
+) -> tuple[Path, list[tuple[int, list, str, Finding]], int, int]:
+    """Scan a single file; safe to call from a thread pool worker.
+
+    Returns (path, findings_list, strings_scanned, suppressed_count).
+    Callbacks are NOT invoked here — the caller dispatches them on the main
+    thread after each future completes, so Rich Live is never touched from a
+    worker thread.
+    """
+    items: list[tuple[int, list, str, Finding]] = []
+    strings_scanned = 0
+    suppressed = 0
+    relpath = ui.rel(f, source.root)
+    for line_num, keypath, value in source.iter_strings(f):
+        strings_scanned += 1
+        for finding in scan_text(value):
+            finding.file = f
+            finding.line = line_num
+            finding.keypath = keypath
+            if ignores:
+                fp = ignore_mod.fingerprint(relpath, line_num, finding.rule)
+                if ignores.matches(finding.rule, finding.value, fp):
+                    suppressed += 1
+                    continue
+            items.append((line_num, keypath, value, finding))
+    return f, items, strings_scanned, suppressed
+
+
+# Maximum parallel workers for file scanning.  Chosen empirically: beyond
+# ~8 the marginal gain on local SSDs disappears while lock contention grows.
+# The constant is also kept small enough that the thread pool spins up/down
+# within the lifetime of a normal scan.
+_SCAN_WORKERS = 8
+
+
 def _scan_all(
     source: Source,
     files: list[Path],
@@ -188,24 +227,38 @@ def _scan_all(
     out: dict[Path, list[tuple[int, list, str, Finding]]] = {}
     strings_scanned = 0
     suppressed = 0
-    for f in files:
-        if on_file is not None:
-            on_file(f)
-        relpath = ui.rel(f, source.root)
-        for line_num, keypath, value in source.iter_strings(f):
-            strings_scanned += 1
-            for finding in scan_text(value):
-                finding.file = f
-                finding.line = line_num
-                finding.keypath = keypath
-                if ignores:
-                    fp = ignore_mod.fingerprint(relpath, line_num, finding.rule)
-                    if ignores.matches(finding.rule, finding.value, fp):
-                        suppressed += 1
-                        continue
-                out.setdefault(f, []).append((line_num, keypath, value, finding))
+
+    # For tiny workloads the thread-pool overhead exceeds the I/O overlap
+    # benefit; fall back to the sequential path for ≤4 files.
+    if len(files) <= 4:
+        for f in files:
+            if on_file is not None:
+                on_file(f)
+            _, items, sc, sup = _scan_file(source, f, ignores)
+            strings_scanned += sc
+            suppressed += sup
+            for entry in items:
+                out.setdefault(f, []).append(entry)
                 if on_finding is not None:
-                    on_finding(finding)
+                    on_finding(entry[3])
+        return out, strings_scanned, suppressed
+
+    workers = min(_SCAN_WORKERS, len(files))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {
+            pool.submit(_scan_file, source, f, ignores): f
+            for f in files
+        }
+        for fut in as_completed(futures):
+            f, items, sc, sup = fut.result()
+            strings_scanned += sc
+            suppressed += sup
+            if on_file is not None:
+                on_file(f)
+            for entry in items:
+                out.setdefault(f, []).append(entry)
+                if on_finding is not None:
+                    on_finding(entry[3])
     return out, strings_scanned, suppressed
 
 

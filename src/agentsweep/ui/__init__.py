@@ -33,3 +33,5 @@ from .widgets import (  # noqa: F401
     stage,
     warn_line,
 )
+from . import keys  # noqa: F401
+from .picker import action_menu, source_picker  # noqa: F401
