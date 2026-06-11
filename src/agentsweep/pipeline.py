@@ -55,7 +55,13 @@ def run(args) -> int:
     if not args.json:
         ui.banner(__version__)
 
-    files = source.files()
+    if not args.json:
+        with ui.console.status(
+            f"[dim]Discovering files in [bold]{source.root}[/bold]…[/dim]"
+        ):
+            files = source.files()
+    else:
+        files = source.files()
     if not files:
         print(f"No history files found under {source.root}", file=sys.stderr)
         if args.json:
