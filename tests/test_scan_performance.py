@@ -71,6 +71,39 @@ def test_prefilter_covers_anchored_and_context_rules():
     assert len(_PREFILTER) > 150
 
 
+def test_prefilter_backend_is_lossless_vs_running_all_rules():
+    """The single-pass anchor dispatch must find exactly what running every
+    rule would — proving the Aho-Corasick (or fallback) backend drops nothing,
+    including overlapping-literal cases like `git` inside `gitlab`."""
+    import agentsweep.scanner as sc
+    from test_ported_rules import FIXTURES  # type: ignore
+
+    samples = list(FIXTURES.values()) + [
+        "just some normal english prose about keys tokens and secrets",
+        "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+        "gitlab and github and git all mentioned here with glpat-a1b2c3a1b2c3a1b2c3ab",
+        "",
+    ]
+
+    def fp(text):
+        return sorted((f.rule, f.span) for f in sc.scan_text(text))
+
+    orig = sc._triggered_indices
+    try:
+        prefiltered = [fp(s) for s in samples]
+        sc._triggered_indices = lambda lowered: set(range(len(sc.RULES)))
+        all_rules = [fp(s) for s in samples]
+    finally:
+        sc._triggered_indices = orig
+
+    assert prefiltered == all_rules
+
+
+def test_prefilter_backend_named():
+    from agentsweep.scanner import PREFILTER_BACKEND
+    assert PREFILTER_BACKEND in ("aho-corasick", "substring")
+
+
 def test_prefilter_does_not_change_findings():
     """Gating must be lossless: a string containing a context keyword still
     runs the rule exactly as before."""

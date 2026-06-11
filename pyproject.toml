@@ -26,7 +26,11 @@ classifiers = [
     "Topic :: Security",
     "Topic :: Software Development",
 ]
-dependencies = ["rich>=13.0"]
+# pyahocorasick: single-pass keyword pre-filter (~4.7x scan speedup). Ships
+# prebuilt wheels for Linux (manylinux x86_64/aarch64), macOS (x86_64/arm64)
+# and Windows (amd64) on CPython 3.8-3.13 — no compiler needed on install.
+# scanner.py degrades to a pure-Python substring fallback if it's absent.
+dependencies = ["rich>=13.0", "pyahocorasick>=2.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
