@@ -310,6 +310,8 @@ def mask(secret: str) -> str:
 
 
 def scan_text(text: str) -> list[Finding]:
+    from .mnemonic import detect_mnemonics  # late import: avoids a cycle
+
     findings: list[Finding] = []
     for rule_id, display, pattern in RULES:
         for m in pattern.finditer(text):
@@ -321,8 +323,14 @@ def scan_text(text: str) -> list[Finding]:
                 masked=mask(val),
                 span=(m.start(), m.end()),
             ))
+    findings.extend(detect_mnemonics(text))
     findings.sort(key=lambda f: f.span[0])
     return _dedupe_overlapping(findings)
+
+
+# Function-based detectors (not regex RULES entries). Listed so coverage
+# checks — rotation guidance, drift mapping — can account for them.
+DETECTOR_IDS: tuple[str, ...] = ("bip39-mnemonic",)
 
 
 def _dedupe_overlapping(findings: list[Finding]) -> list[Finding]:
@@ -340,6 +348,7 @@ def _dedupe_overlapping(findings: list[Finding]) -> list[Finding]:
 
 
 ROTATION_GUIDANCE: dict[str, str] = {
+    'bip39-mnemonic': 'Move ALL funds to a freshly generated wallet immediately — a leaked seed phrase cannot be rotated, only abandoned. Treat every chain derived from it as compromised.',
     "aws-access-key": "Rotate: aws iam create-access-key, then aws iam delete-access-key --access-key-id <ID>",
     "aws-session-token": "Session tokens are short-lived; rotate the underlying IAM role/user credentials.",
     "github-pat": "Revoke: https://github.com/settings/tokens",

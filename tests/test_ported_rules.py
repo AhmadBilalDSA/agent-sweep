@@ -166,8 +166,9 @@ def test_rotation_guidance_present_or_cli_default_applies() -> None:
     missing_ported = sorted(r for r in FIXTURES if r not in ROTATION_GUIDANCE)
     assert not missing_ported, f"ported rules lacking guidance: {missing_ported}"
 
-    # and right now every shipped rule has an explicit entry.
-    rule_ids = {rule_id for rule_id, _d, _p in RULES}
+    # and right now every shipped rule and detector has an explicit entry.
+    from agentsweep.scanner import DETECTOR_IDS
+    rule_ids = {rule_id for rule_id, _d, _p in RULES} | set(DETECTOR_IDS)
     missing = sorted(rule_ids - set(ROTATION_GUIDANCE))
     assert not missing, f"rules lacking guidance: {missing}"
     stale = sorted(set(ROTATION_GUIDANCE) - rule_ids)
