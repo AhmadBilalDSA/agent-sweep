@@ -11,6 +11,7 @@ imports are lazy to avoid a cycle (cli imports this module).
 from __future__ import annotations
 
 import copy
+import os
 from pathlib import Path
 
 from . import __version__, ui
@@ -20,6 +21,11 @@ from .pipeline import _suggest_paths
 def run_menu() -> int:
     from .cli import main
 
+    # Clear once on entry so the banner gets a clean canvas — but NOT between
+    # menu actions (you want your scan results to stay on screen), and never
+    # for flag/piped runs (that path doesn't reach here). Honors NO_ANIM.
+    if ui.console.is_terminal and not os.environ.get("AGENTSWEEP_NO_ANIM"):
+        ui.console.clear()
     ui.big_banner(__version__)
     while True:
         ui.menu_options()

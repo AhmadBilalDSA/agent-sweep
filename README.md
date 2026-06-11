@@ -1,5 +1,7 @@
 # AgentSweep
 
+![AgentSweep](docs/wordmark.jpg)
+
 > Find and redact secrets (API keys, tokens, private keys, DB URLs) that got pasted into your AI coding agent's local history.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
