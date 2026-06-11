@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "agentsweep"
 version = "0.1.0"
 description = "Find and redact secrets in AI coding agent histories (Claude Code, and more)."
-readme = "README.md"
+readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "MIT" }
 # 3.11 floor: ported gitleaks rules use scoped inline flags like (?i:...),
 # which Python's re only supports from 3.11.
@@ -21,6 +21,8 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Security",
     "Topic :: Software Development",
 ]
@@ -38,3 +40,20 @@ Issues = "https://github.com/Ishannaik/agent-sweep/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentsweep"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/agentsweep/__init__.py" = "agentsweep/__init__.py"
+"src/agentsweep/ui/__init__.py" = "agentsweep/ui/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/LICENSE",
+    "/README.md",
+    "/pyproject.toml",
+]
+
+[tool.hatch.build.targets.sdist.force-include]
+"src/agentsweep/__init__.py" = "src/agentsweep/__init__.py"
+"src/agentsweep/ui/__init__.py" = "src/agentsweep/ui/__init__.py"

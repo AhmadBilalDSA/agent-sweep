@@ -24,6 +24,8 @@ Thumbs.db
 
 # Scratch/debug scripts (often contain unsplit fake secrets that trip
 # push protection) — keep them out of the repo entirely.
+# Note: _[a-z]*.py (not _*.py) so dunder files like __init__.py are NOT
+# matched — that glob silently dropped packages from the built wheel.
 debug_*.py
 verify_*.py
-_*.py
+_[a-z]*.py
