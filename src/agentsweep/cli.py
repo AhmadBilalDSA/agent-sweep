@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -16,7 +17,20 @@ from .sources import SOURCES, Source
 REDACT_TEMPLATE = "[REDACTED:{rule}]"
 
 
+def _interactive() -> bool:
+    """True when a human is at both ends (stdin tty + terminal stdout)."""
+    try:
+        return sys.stdin.isatty() and ui.console.is_terminal
+    except Exception:
+        return False
+
+
 def main(argv: list[str] | None = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+    if not argv and _interactive():
+        return _menu()
+
     ap = argparse.ArgumentParser(
         prog="agentsweep",
         description="Find and redact secrets in AI coding agent histories.",
@@ -142,6 +156,105 @@ def main(argv: list[str] | None = None) -> int:
     ui.rotation_panel(_rotation_items(found_by_file))
 
     return 0 if errors == 0 else 2
+
+
+def _menu() -> int:
+    """Interactive mode: big banner + numbered actions.
+
+    Forgiveness & confirmation: nothing destructive runs without an explicit
+    typed confirmation, backups are always kept, and option 4 undoes the
+    last redaction by restoring them. Flags/pipes bypass this entirely.
+    """
+    ui.big_banner(__version__)
+    while True:
+        ui.menu_options()
+        try:
+            choice = input("  > ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return 0
+
+        if choice == "1":
+            main(["--source", "claude-code"])
+        elif choice == "2":
+            try:
+                raw = input("  folder to scan: ").strip().strip('"')
+            except (EOFError, KeyboardInterrupt):
+                print()
+                return 0
+            if raw:
+                main(["--root", raw])
+        elif choice == "3":
+            _menu_redact()
+        elif choice == "4":
+            _menu_undo()
+        elif choice == "5":
+            main(["--source", "claude-code", "--json"])
+        elif choice in {"6", "q", "quit", "exit"}:
+            return 0
+        else:
+            ui.warn_line(f"unknown option: {choice!r} — pick 1-6")
+            continue
+
+        try:
+            input("\n  press Enter for the menu...")
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return 0
+
+
+def _menu_redact() -> None:
+    ui.warn_line("This rewrites files under your Claude Code history in place.")
+    ui.warn_line("Every file gets a .bak backup; option 4 can undo afterwards.")
+    try:
+        typed = input("  type REDACT to confirm (anything else cancels): ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return
+    if typed != "REDACT":
+        ui.warn_line("cancelled — nothing was written")
+        return
+
+    code = main(["--fix", "--allow-production"])
+    if code != 2:
+        return
+    # A safety gate refused (most likely: Claude Code is running).
+    try:
+        retry = input(
+            "  a safety gate blocked the redaction (see above).\n"
+            "  override with --force? Only safe if no agent session is "
+            "actively writing. [y/N]: "
+        ).strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return
+    if retry == "y":
+        main(["--fix", "--allow-production", "--force"])
+
+
+def _menu_undo() -> None:
+    source = SOURCES["claude-code"]()
+    backups = sorted(source.root.rglob("*.jsonl.bak")) if source.root.exists() else []
+    if not backups:
+        ui.warn_line(f"no .bak backups found under {source.root}")
+        return
+    print(f"  {len(backups)} backup(s) found under {source.root}")
+    try:
+        confirm = input(
+            "  restore them over the redacted files? [y/N]: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return
+    if confirm != "y":
+        ui.warn_line("cancelled — backups kept as-is")
+        return
+    for bak in backups:
+        original = bak.with_name(bak.name[: -len(".bak")])
+        try:
+            os.replace(bak, original)
+            ui.redact_row("ok", ui.rel(original, source.root), "restored from .bak")
+        except OSError as e:
+            ui.redact_row("fail", ui.rel(bak, source.root), str(e))
 
 
 def _scan_all(

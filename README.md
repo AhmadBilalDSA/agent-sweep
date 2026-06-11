@@ -24,10 +24,25 @@ Requires Python 3.10+. One dependency: [`rich`](https://github.com/Textualize/ri
 
 ## Usage
 
-Scan (read-only, safe):
+### Interactive mode
+
+Run with no arguments in a terminal and you get the full experience — banner,
+numbered menu, typed confirmations before anything destructive, and one-key
+undo (restores the `.bak` backups):
 
 ```
 agentsweep
+```
+
+Scripting is unaffected: any flag, or a piped/redirected stream, skips the
+menu entirely and behaves exactly as documented below.
+
+### Flags
+
+Scan (read-only, safe):
+
+```
+agentsweep --source claude-code
 ```
 
 Redact in place (creates `.bak` backups):

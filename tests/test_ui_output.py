@@ -244,6 +244,77 @@ def test_fix_writes_audit_log_in_isolated_home(
     assert record["path"].endswith("session.jsonl")
 
 
+# ----------------------------------------------------------------- menu
+
+def _feed_menu(monkeypatch, answers: list[str]):
+    monkeypatch.setattr(cli, "_interactive", lambda: True)
+    it = iter(answers)
+    monkeypatch.setattr("builtins.input", lambda *a: next(it))
+
+
+def test_no_args_non_tty_keeps_scan_behavior(tmp_path, _isolated_home, capsys):
+    """Pipes/CI must never get the menu — plain scan as before."""
+    code = main([])
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "No history files found" in captured.err
+    assert "MENU" not in captured.out
+
+
+def test_menu_renders_and_quits(monkeypatch, _isolated_home, capsys):
+    _feed_menu(monkeypatch, ["6"])
+    assert main([]) == 0
+    out = capsys.readouterr().out
+    assert "MENU" in out
+    assert "Undo last redaction" in out
+    assert "secret scanner for AI agent histories" in out
+
+
+def test_menu_scan_action_then_quit(monkeypatch, _isolated_home, capsys):
+    _feed_menu(monkeypatch, ["1", "", "q"])
+    assert main([]) == 0
+    captured = capsys.readouterr()
+    assert "No history files found" in captured.err
+
+
+def test_menu_invalid_choice_reprompts(monkeypatch, _isolated_home, capsys):
+    _feed_menu(monkeypatch, ["9", "6"])
+    assert main([]) == 0
+    assert "unknown option" in capsys.readouterr().err
+
+
+def test_menu_redact_requires_typed_confirmation(
+        monkeypatch, _isolated_home, _no_claude, capsys):
+    fake_root = _isolated_home / ".claude" / "projects"
+    fake_root.mkdir(parents=True)
+    session = fake_root / "session.jsonl"
+    session.write_text(FIXTURE_LINE, encoding="utf-8")
+
+    # "redact" (lowercase) is NOT the magic word — nothing must be written.
+    _feed_menu(monkeypatch, ["3", "redact", "", "6"])
+    assert main([]) == 0
+    assert AWS_KEY in session.read_text(encoding="utf-8")
+    assert not session.with_name("session.jsonl.bak").exists()
+
+
+def test_menu_redact_confirmed_writes_and_undo_restores(
+        monkeypatch, _isolated_home, _no_claude, capsys):
+    fake_root = _isolated_home / ".claude" / "projects"
+    fake_root.mkdir(parents=True)
+    session = fake_root / "session.jsonl"
+    session.write_text(FIXTURE_LINE, encoding="utf-8")
+    original = session.read_text(encoding="utf-8")
+
+    # 3 → REDACT → (mtime gate refuses fresh file → exit 2) → y forces →
+    # Enter → 4 undo → y → Enter → 6 quit.
+    _feed_menu(monkeypatch, ["3", "REDACT", "y", "", "4", "y", "", "6"])
+    assert main([]) == 0
+
+    restored = session.read_text(encoding="utf-8")
+    assert restored == original  # undo brought the secret back, bak consumed
+    assert not session.with_name("session.jsonl.bak").exists()
+
+
 # ------------------------------------------------------- encoding fallback
 
 def _console_with_encoding(encoding: str):

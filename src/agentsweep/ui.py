@@ -81,6 +81,59 @@ def _box(c: Console, fancy: box.Box) -> box.Box:
     return fancy if _encodes(c, "═━│┃") else box.ASCII
 
 
+# 5-row block font for the interactive-mode banner. '#' is replaced with a
+# full block when the stream can render it.
+_FONT = {
+    "A": [" ### ", "#   #", "#####", "#   #", "#   #"],
+    "G": [" ####", "#    ", "# ###", "#   #", " ### "],
+    "E": ["#####", "#    ", "#### ", "#    ", "#####"],
+    "N": ["#   #", "##  #", "# # #", "#  ##", "#   #"],
+    "T": ["#####", "  #  ", "  #  ", "  #  ", "  #  "],
+    "S": [" ####", "#    ", " ### ", "    #", "#### "],
+    "W": ["#   #", "#   #", "# # #", "## ##", "#   #"],
+    "P": ["#### ", "#   #", "#### ", "#    ", "#    "],
+}
+_GRADIENT = ["red", "red", "dark_orange", "orange1", "yellow"]
+
+
+def big_banner(version: str) -> None:
+    """Full-size two-line AGENT / SWEEP banner for interactive mode."""
+    fill = "█" if _encodes(console, "█") else "#"
+    console.print()
+    for word in ("AGENT", "SWEEP"):
+        for r in range(5):
+            line = " ".join(_FONT[ch][r] for ch in word)
+            console.print(Text("   " + line.replace("#", fill),
+                               style=f"bold {_GRADIENT[r]}"))
+        console.print()
+    console.print(Text(f"   secret scanner for AI agent histories — v{version}",
+                       style="dim"))
+    console.print()
+
+
+def menu_options() -> None:
+    """Numbered action menu for interactive mode."""
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(style="bold red", justify="right")
+    grid.add_column()
+    grid.add_column(style="dim")
+    grid.add_row("[1]", "Scan Claude Code history", "read-only")
+    grid.add_row("[2]", "Scan a custom folder", "read-only")
+    grid.add_row("[3]", "Redact Claude Code history", "asks to confirm · .bak backups")
+    grid.add_row("[4]", "Undo last redaction", "restores .bak backups")
+    grid.add_row("[5]", "Findings as JSON", "read-only")
+    grid.add_row("[6]", "Quit", "")
+    console.print(Padding(Panel(
+        grid,
+        title="MENU",
+        title_align="left",
+        border_style="red",
+        box=_box(console, box.HEAVY),
+        padding=(1, 2),
+        expand=False,
+    ), (0, 0, 0, 2)))
+
+
 def banner(version: str) -> None:
     wing = "▄▄▄" if _encodes(console, "▄") else "==="
     t = Text("  ")
