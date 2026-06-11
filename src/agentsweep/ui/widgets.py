@@ -44,11 +44,12 @@ def menu_options() -> None:
     grid.add_column(style="dim")
     grid.add_row("[1]", "Scan Claude Code history", "read-only")
     grid.add_row("[2]", "Scan Codex history", "read-only")
-    grid.add_row("[3]", "Scan a custom folder", "read-only")
-    grid.add_row("[4]", "Redact Claude Code history", "asks to confirm · .bak backups")
-    grid.add_row("[5]", "Undo last redaction", "restores .bak backups")
-    grid.add_row("[6]", "Findings as JSON", "read-only")
-    grid.add_row("[7]", "Quit", "")
+    grid.add_row("[3]", "Scan OpenCode history", "read-only")
+    grid.add_row("[4]", "Scan a custom folder", "read-only")
+    grid.add_row("[5]", "Redact Claude Code history", "asks to confirm · .bak backups")
+    grid.add_row("[6]", "Undo last redaction", "restores .bak backups")
+    grid.add_row("[7]", "Findings as JSON", "read-only")
+    grid.add_row("[8]", "Quit", "")
     console.print(Padding(Panel(
         grid,
         title="MENU",
