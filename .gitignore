@@ -22,6 +22,11 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# agentsweep's own default output files (anti-flood / -o defaults)
+agentsweep-report.txt
+agentsweep-findings.json
+*.stackdump
+
 # Scratch/debug scripts (often contain unsplit fake secrets that trip
 # push protection) — keep them out of the repo entirely.
 # Note: _[a-z]*.py (not _*.py) so dunder files like __init__.py are NOT

@@ -2,12 +2,17 @@
 from __future__ import annotations
 
 import os
+import time
 from collections import deque
 
 from .console import _encodes, _safe, console
+from ..tips import tip_for
 
 # Maximum recent detections shown in the live feed.
 _MAX_FEED = 6
+
+# Rotate to a new tip every this many seconds.
+_TIP_INTERVAL = 7
 
 
 class _NullScanProgress:
@@ -62,6 +67,7 @@ class _RichScanProgress:
         self._hits: int = 0
         self._feed: deque[tuple[str, str, str]] = deque(maxlen=_MAX_FEED)
         self._live: object | None = None  # rich.live.Live
+        self._start_time: float = 0.0
 
     # ------------------------------------------------------------------ render
 
@@ -129,12 +135,21 @@ class _RichScanProgress:
         # ── progress bar ─────────────────────────────────────────────────────
         parts.append(self._progress)
 
+        # ── rotating tip ────────────────────────────────────────────────────
+        elapsed = time.monotonic() - self._start_time if self._start_time else 0.0
+        tip_index = int(elapsed / _TIP_INTERVAL)
+        tip_text = Text("        ")
+        tip_text.append("Tip: ", style="dim")
+        tip_text.append(_safe(console, tip_for(tip_index)), style="dim")
+        parts.append(tip_text)
+
         return Group(*parts)
 
     # ------------------------------------------------------------------ ctx mgr
 
     def __enter__(self) -> "_RichScanProgress":
         from rich.live import Live
+        self._start_time = time.monotonic()
         self._task = self._progress.add_task(
             "scan", total=self._total, current="")
         self._live = Live(
