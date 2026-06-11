@@ -393,18 +393,65 @@ def stage(n: int, status: str, name: str, *parts: object, err: bool = False) -> 
     target.print(t, soft_wrap=True)
 
 
-def scanning(n_files: int):
-    """Spinner context manager for the scan phase.
+class _NullScanProgress:
+    """No-op progress for pipes/CI — keeps the call sites unconditional."""
 
-    Only animate on a real terminal that can encode braille frames:
-    FORCE_COLOR on a cp1252 pipe would otherwise crash rich mid-spin.
+    def __enter__(self) -> "_NullScanProgress":
+        return self
+
+    def __exit__(self, *exc) -> bool:
+        return False
+
+    def advance(self, current: str) -> None:
+        pass
+
+
+class _RichScanProgress:
+    """Live per-file progress bar for the SCAN phase.
+
+    transient=True: the bar vanishes when done, so the pipeline's SCAN
+    stage line takes its place without leftover bar artifacts.
     """
-    if console.is_terminal and _encodes(console, "⠋"):
-        return console.status(
-            Text(f"scanning {n_files} file(s)...", style="bold cyan"),
-            spinner="dots",
+
+    def __init__(self, total: int):
+        from rich.progress import (
+            BarColumn, MofNCompleteColumn, Progress, TaskProgressColumn,
+            TextColumn, TimeElapsedColumn,
         )
-    return contextlib.nullcontext()
+        self._progress = Progress(
+            TextColumn("        "),
+            TextColumn("SCAN", style="bold cyan"),
+            BarColumn(bar_width=28, complete_style="red",
+                      finished_style="bold green"),
+            TaskProgressColumn(),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+            TextColumn("{task.fields[current]}", style="dim"),
+            console=console,
+            transient=True,
+        )
+        self._total = total
+        self._task: int | None = None
+
+    def __enter__(self) -> "_RichScanProgress":
+        self._progress.__enter__()
+        self._task = self._progress.add_task(
+            "scan", total=self._total, current="")
+        return self
+
+    def __exit__(self, *exc) -> bool:
+        return bool(self._progress.__exit__(*exc))
+
+    def advance(self, current: str) -> None:
+        self._progress.update(self._task, advance=1,
+                              current=_safe(console, current))
+
+
+def scan_progress(n_files: int):
+    """Per-file progress bar on real terminals; silent no-op otherwise."""
+    if console.is_terminal and not os.environ.get("AGENTSWEEP_NO_ANIM"):
+        return _RichScanProgress(n_files)
+    return _NullScanProgress()
 
 
 def findings_table(rows: list[tuple[str, str, Path, int]], root: Path) -> None:

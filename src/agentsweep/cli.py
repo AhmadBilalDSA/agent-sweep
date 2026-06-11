@@ -109,8 +109,11 @@ def main(argv: list[str] | None = None) -> int:
     ui.stage(1, "ok", "DISCOVER", source.name, f"{len(files)} file(s)", source.root)
 
     t0 = time.perf_counter()
-    with ui.scanning(len(files)):
-        found_by_file, strings_scanned = _scan_all(source, files)
+    with ui.scan_progress(len(files)) as progress:
+        found_by_file, strings_scanned = _scan_all(
+            source, files,
+            on_file=lambda f: progress.advance(ui.rel(f, source.root)),
+        )
     elapsed = time.perf_counter() - t0
 
     ui.stage(2, "ok", "SCAN", f"{len(files)} file(s)",
@@ -307,10 +310,13 @@ def _menu_undo() -> None:
 def _scan_all(
     source: Source,
     files: list[Path],
+    on_file=None,
 ) -> tuple[dict[Path, list[tuple[int, list, str, Finding]]], int]:
     out: dict[Path, list[tuple[int, list, str, Finding]]] = {}
     strings_scanned = 0
     for f in files:
+        if on_file is not None:
+            on_file(f)
         for line_num, keypath, value in source.iter_strings(f):
             strings_scanned += 1
             for finding in scan_text(value):

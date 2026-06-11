@@ -389,6 +389,15 @@ def test_unicode_icons_on_utf8_stream():
     assert ui._icons(c) == ui._ICONS_UNICODE
 
 
+def test_scan_progress_is_silent_off_terminal(capsys):
+    with ui.scan_progress(5) as progress:
+        progress.advance("a.jsonl")
+        progress.advance("b.jsonl")
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
+
+
 def test_safe_escapes_unencodable_path_chars():
     c = _console_with_encoding("cp1252")
     # ✓ (U+2713) cannot encode to cp1252; printing it raw would crash.
