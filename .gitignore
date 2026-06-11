@@ -21,3 +21,9 @@ htmlcov/
 *.swp
 .DS_Store
 Thumbs.db
+
+# Scratch/debug scripts (often contain unsplit fake secrets that trip
+# push protection) — keep them out of the repo entirely.
+debug_*.py
+verify_*.py
+_*.py

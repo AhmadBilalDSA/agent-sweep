@@ -300,6 +300,124 @@ RULES: list[tuple[str, str, re.Pattern]] = [
     # method/attribute name. hvs. covers every token since Vault 1.10.
     ('vault-service-token', 'HashiCorp Vault service token',
         re.compile('\\bhvs\\.[\\w-]{90,120}(?![\\w-])')),
+
+    # --- gitleaks port wave 2 ---
+    ('adafruit-api-key', 'Adafruit API Key',
+        re.compile('(?i)[\\w.-]{0,50}?(?:adafruit)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9_-]*[0-9])(?=[a-z0-9_-]*[a-z])([a-z0-9_-]{32})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('airtable-api-key', 'Airtable API Key (Legacy)',
+        re.compile('(?i)[\\w.-]{0,50}?(?:airtable)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{17})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('algolia-api-key', 'Algolia API Key',
+        re.compile('(?i)[\\w.-]{0,50}?(?:algolia)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{32})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('asana-client-id', 'Asana Client ID',
+        re.compile('(?i)[\\w.-]{0,50}?(?:asana)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([0-9]{16})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('asana-client-secret', 'Asana Client Secret',
+        re.compile('(?i)[\\w.-]{0,50}?(?:asana)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{32})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('beamer-api-token', 'Beamer API Token',
+        re.compile('(?i)[\\w.-]{0,50}?(?:beamer)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(b_[a-z0-9=_\\-]{44})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('bitbucket-client-id', 'Bitbucket Client ID',
+        re.compile('(?i)[\\w.-]{0,50}?(?:bitbucket)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{32})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('bitbucket-client-secret', 'Bitbucket Client Secret',
+        re.compile('(?i)[\\w.-]{0,50}?(?:bitbucket)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9=_-]*[0-9])(?=[a-z0-9=_-]*[a-z])([a-z0-9=_-]{64})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('bittrex-access-key', 'Bittrex Access Key',
+        re.compile('(?i)[\\w.-]{0,50}?(?:bittrex)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{32})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('codecov-access-token', 'Codecov Access Token',
+        re.compile('(?i)[\\w.-]{0,50}?(?:codecov)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{32})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('coinbase-access-token', 'Coinbase Access Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:coinbase)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9_-]*[0-9])(?=[a-z0-9_-]*[a-z])([a-z0-9_-]{64})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('confluent-access-token', 'Confluent Access Token',
+        re.compile('(?i)[\\w.-]{0,50}?(?:confluent)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{16})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('confluent-secret-key', 'Confluent Secret Key',
+        re.compile('(?i)[\\w.-]{0,50}?(?:confluent)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{64})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('contentful-delivery-api-token', 'Contentful Delivery API Token',
+        re.compile('(?i)[\\w.-]{0,50}?(?:contentful)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9=_-]*[0-9])(?=[a-z0-9=_-]*[a-z])([a-z0-9=_-]{43})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('datadog-access-token', 'Datadog Access Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:datadog)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{40})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('discord-api-token', 'Discord API Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:discord)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([a-f0-9]{64})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('dropbox-api-token', 'Dropbox API Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:dropbox)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{15})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('dropbox-long-lived-api-token', 'Dropbox Long-Lived API Token',
+        re.compile('(?i)[\\w.-]{0,50}?(?:dropbox)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([a-z0-9]{11}AAAAAAAAAA[a-z0-9\\-_=]{43})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('dropbox-short-lived-api-token', 'Dropbox Short-Lived API Token',
+        re.compile('(?i)[\\w.-]{0,50}?(?:dropbox)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(sl\\.[a-z0-9\\-=_]{135})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('droneci-access-token', 'Drone CI Access Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:droneci)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{32})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('fastly-api-token', 'Fastly API Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:fastly)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9=_\\-]*[0-9])(?=[a-z0-9=_\\-]*[a-z])([a-z0-9=_\\-]{32})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('finicity-client-secret', 'Finicity Client Secret',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:finicity)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{20})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('finnhub-access-token', 'Finnhub Access Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:finnhub)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{20})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('flickr-access-token', 'Flickr Access Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:flickr)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{32})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('freemius-secret-key', 'Freemius Secret Key',
+        re.compile('["\']secret_key["\']\\s*=>\\s*["\'](sk_[\\S]{29})["\']')),
+    ('freshbooks-access-token', 'FreshBooks Access Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:freshbooks)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{64})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('gitter-access-token', 'Gitter Access Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:gitter)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9_-]*[0-9])(?=[a-z0-9_-]*[a-z])([a-z0-9_-]{40})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('gocardless-api-token', 'GoCardless API Token',
+        re.compile('(?i)[\\w.-]{0,50}?(?:gocardless)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(live_[a-zA-Z0-9\\-_=]{40})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('heroku-api-key-legacy', 'Heroku API Key (UUID format)',
+        re.compile('(?i)[\\w.-]{0,50}?(?:heroku)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('hubspot-api-key', 'HubSpot API Key',
+        re.compile('(?i)[\\w.-]{0,50}?(?:hubspot)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('intercom-api-key', 'Intercom API Key',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:intercom)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9=_\\-]*[0-9])(?=[a-z0-9=_\\-]*[a-z])([a-z0-9=_\\-]{60})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('jfrog-api-key', 'JFrog API Key',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:jfrog|artifactory|bintray|xray)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{73})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('jfrog-identity-token', 'JFrog Identity Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:jfrog|artifactory|bintray|xray)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])([a-z0-9]{64})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('kraken-access-token', 'Kraken Access Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:kraken)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9/=_+\\-]*[0-9])(?=[a-z0-9/=_+\\-]*[a-z])([a-z0-9/=_+\\-]{80,90})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('kucoin-access-token', 'KuCoin Access Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:kucoin)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([a-f0-9]{24})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('kucoin-secret-key', 'KuCoin Secret Key',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:kucoin)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('launchdarkly-access-token', 'LaunchDarkly Access Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:launchdarkly)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(?=[a-z0-9=_\\-]*[0-9])(?=[a-z0-9=_\\-]*[a-z])([a-z0-9=_\\-]{40})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('lob-api-key', 'Lob API Key',
+        re.compile('(?i)[\\w.-]{0,50}?(?:lob)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}((live|test)_[a-f0-9]{35})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('lob-pub-api-key', 'Lob Publishable API Key',
+        re.compile('(?i)[\\w.-]{0,50}?(?:lob)(?:[ \\t\\w.-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}((test|live)_pub_[a-f0-9]{31})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('mailchimp-api-key', 'Mailchimp API Key',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:MailchimpSDK\\.initialize|mailchimp)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([a-f0-9]{32}-us\\d\\d)(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('mattermost-access-token', 'Mattermost Access Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:mattermost)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([a-z0-9]{26})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('messagebird-api-token', 'MessageBird API Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:message[_\\-]?bird)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([a-z0-9]{25})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('messagebird-client-id', 'MessageBird Client ID',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:message[_\\-]?bird)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('netlify-access-token', 'Netlify Access Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:netlify)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([a-z0-9=_\\-]{40,46})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('sendbird-access-id', 'Sendbird Access ID',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:sendbird)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('sonar-api-token', 'SonarQube/SonarCloud API Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:sonar[_.\\-]?(?:login|token))(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}((?:squ_|sqp_|sqa_)?[a-z0-9=_\\-]{40})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('sourcegraph-access-token', 'Sourcegraph Access Token',
+        re.compile('(?:sgp_(?:[a-fA-F0-9]{16}|local)_[a-fA-F0-9]{40}|sgp_[a-fA-F0-9]{40})')),
+    ('squarespace-access-token', 'Squarespace Access Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?(?:squarespace)(?:[ \\t\\w.\\-]{0,20})[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('travisci-access-token', 'Travis CI Access Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?travis[\\w.\\- \\t]{0,20}[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([a-z0-9]{22})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('twitch-api-token', 'Twitch API Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?twitch[\\w.\\- \\t]{0,20}[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([a-z0-9]{30})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('twitter-access-secret', 'Twitter/X Access Token Secret',
+        re.compile('(?i)[\\w.\\-]{0,50}?twitter[\\w.\\- \\t]{0,20}[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([a-z0-9]{45})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('twitter-access-token', 'Twitter/X Access Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?twitter[\\w.\\- \\t]{0,20}[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([0-9]{15,25}-[a-zA-Z0-9]{20,40})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('twitter-api-key', 'Twitter/X API Key',
+        re.compile('(?i)[\\w.\\-]{0,50}?twitter[\\w.\\- \\t]{0,20}[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([a-z0-9]{25})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('twitter-api-secret', 'Twitter/X API Secret',
+        re.compile('(?i)[\\w.\\-]{0,50}?twitter[\\w.\\- \\t]{0,20}[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}([a-z0-9]{50})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('twitter-bearer-token', 'Twitter/X Bearer Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?twitter[\\w.\\- \\t]{0,20}[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(A{22}[a-zA-Z0-9%]{80,100})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('yandex-api-key', 'Yandex API Key',
+        re.compile('(?i)[\\w.\\-]{0,50}?yandex[\\w.\\- \\t]{0,20}[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(AQVN[A-Za-z0-9_\\-]{35,38})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('yandex-aws-access-token', 'Yandex Cloud AWS Access Key',
+        re.compile('(?i)[\\w.\\-]{0,50}?yandex[\\w.\\- \\t]{0,20}[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(YC[a-zA-Z0-9_\\-]{38})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
+    ('yandex-oauth-access-token', 'Yandex OAuth Access Token',
+        re.compile('(?i)[\\w.\\-]{0,50}?yandex[\\w.\\- \\t]{0,20}[\\s\'"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60\'"\\s=]{0,5}(t1\\.[A-Za-z0-9_\\-]{1,100}={0,2}\\.[A-Za-z0-9_\\-]{86}={0,2})(?:[\\x60\'"\\s;]|\\\\[nr]|$)')),
 ]
 
 
@@ -309,11 +427,95 @@ def mask(secret: str) -> str:
     return secret[:6] + "*" * 8 + secret[-4:]
 
 
+# Keyword pre-filter (the trick gitleaks' engine uses): many ported rules
+# are "context" rules — a lazy [\w.-]{0,50}? gap, then a mandatory provider
+# keyword, then the value. That leading gap makes the engine retry at every
+# position of a long string, so 50 such rules turn an 80KB paste into a
+# multi-second scan. Each rule's keyword is *mandatory* (every string the
+# rule can match contains it), so we skip the regex entirely when none of
+# the keyword's literals appear — provably lossless, and the per-rule
+# fixture tests fail loudly if a prefilter ever over-skips.
+_CONTEXT_SIG = re.compile(r"\{0,50\}\?\(\?:")
+
+
+def _prefilter_literals(pattern: str) -> tuple[str, ...]:
+    """Extract any-of keyword literals from a context rule, or () if none.
+
+    Returns lowercase literals such that a match implies at least one is
+    present. Only the leading mandatory [A-Za-z] run of each top-level
+    alternative is used (anything before a quantifier/class/group is
+    guaranteed to appear verbatim)."""
+    m = _CONTEXT_SIG.search(pattern)
+    if not m:
+        return ()
+    i = m.end()  # just past "(?:"
+    depth = 1
+    group = []
+    while i < len(pattern) and depth:
+        c = pattern[i]
+        if c == "\\":
+            group.append(pattern[i:i + 2])
+            i += 2
+            continue
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                break
+        group.append(c)
+        i += 1
+    body = "".join(group)
+    lits: list[str] = []
+    for alt in _split_top_level(body):
+        run = re.match(r"[A-Za-z]{3,}", alt)
+        if not run:
+            return ()  # an alt has no safe literal — don't prefilter at all
+        lits.append(run.group().lower())
+    return tuple(dict.fromkeys(lits))
+
+
+def _split_top_level(body: str) -> list[str]:
+    out, cur, depth = [], [], 0
+    i = 0
+    while i < len(body):
+        c = body[i]
+        if c == "\\":
+            cur.append(body[i:i + 2])
+            i += 2
+            continue
+        if c in "([":
+            depth += 1
+        elif c in ")]":
+            depth -= 1
+        elif c == "|" and depth == 0:
+            out.append("".join(cur))
+            cur = []
+            i += 1
+            continue
+        cur.append(c)
+        i += 1
+    out.append("".join(cur))
+    return out
+
+
+# rule_id -> any-of keyword literals; absent => rule always runs.
+_PREFILTER: dict[str, tuple[str, ...]] = {
+    rule_id: lits
+    for rule_id, _display, pattern in RULES
+    if (lits := _prefilter_literals(pattern.pattern))
+}
+
+
 def scan_text(text: str) -> list[Finding]:
     from .mnemonic import detect_mnemonics  # late import: avoids a cycle
 
+    lowered = text.lower()
     findings: list[Finding] = []
     for rule_id, display, pattern in RULES:
+        kws = _PREFILTER.get(rule_id)
+        if kws and not any(k in lowered for k in kws):
+            continue
         for m in pattern.finditer(text):
             val = m.group(0)
             findings.append(Finding(
@@ -481,4 +683,63 @@ ROTATION_GUIDANCE: dict[str, str] = {
     'typeform-token': 'Revoke: https://admin.typeform.com/account#/section/tokens',
     'vault-batch-token': 'Batch tokens cannot be revoked directly; revoke the parent token (vault token revoke <parent>) and let the batch token expire at its TTL.',
     'vault-service-token': 'Revoke: vault token revoke <token> (or vault token revoke -self)',
+    # --- gitleaks port wave 2 ---
+    'adafruit-api-key': 'Revoke: https://io.adafruit.com/user/settings/keys',
+    'airtable-api-key': 'Revoke: https://airtable.com/account (API keys section)',
+    'algolia-api-key': 'Revoke: https://www.algolia.com/account/api-keys',
+    'asana-client-id': 'Revoke: https://app.asana.com/0/my-apps',
+    'asana-client-secret': 'Revoke: https://app.asana.com/0/my-apps',
+    'beamer-api-token': 'Revoke: https://app.getbeamer.com/settings#api',
+    'bitbucket-client-id': 'Revoke: https://bitbucket.org/account/settings/app-passwords/',
+    'bitbucket-client-secret': 'Revoke: https://bitbucket.org/account/settings/app-passwords/',
+    'bittrex-access-key': 'Revoke: https://bittrex.com/account/settings (API Keys section)',
+    'codecov-access-token': 'Revoke: https://app.codecov.io/account/tokens',
+    'coinbase-access-token': 'Revoke: https://www.coinbase.com/settings/api',
+    'confluent-access-token': 'Revoke: https://confluent.cloud/settings/api-keys',
+    'confluent-secret-key': 'Revoke: https://confluent.cloud/settings/api-keys',
+    'contentful-delivery-api-token': 'Revoke: https://app.contentful.com/account/profile/cma_tokens',
+    'datadog-access-token': 'Revoke: https://app.datadoghq.com/organization-settings/api-keys',
+    'discord-api-token': 'Revoke: https://discord.com/developers/applications',
+    'dropbox-api-token': 'Revoke: https://www.dropbox.com/developers/apps',
+    'dropbox-long-lived-api-token': 'Revoke: https://www.dropbox.com/account/security',
+    'dropbox-short-lived-api-token': 'Revoke: https://www.dropbox.com/account/security',
+    'droneci-access-token': 'Rotate: https://docs.drone.io/cli/setup/ (drone auth login, generate new token)',
+    'fastly-api-token': 'Revoke: https://manage.fastly.com/account/personal/tokens',
+    'finicity-client-secret': 'Rotate: https://developer.mastercard.com/open-banking-us/documentation/authenticate/',
+    'finnhub-access-token': 'Revoke: https://finnhub.io/dashboard (API Keys section)',
+    'flickr-access-token': 'Revoke: https://www.flickr.com/services/apps/ (manage app keys)',
+    'freemius-secret-key': 'Revoke: https://freemius.com/help/documentation/developers-api/',
+    'freshbooks-access-token': 'Revoke: https://my.freshbooks.com/#/developer (OAuth apps & tokens)',
+    'gitter-access-token': 'Revoke: https://developer.gitter.im/apps',
+    'gocardless-api-token': 'Revoke: https://manage.gocardless.com/developers/access-tokens',
+    'heroku-api-key-legacy': 'Revoke: https://dashboard.heroku.com/account/applications',
+    'hubspot-api-key': 'Revoke: https://app.hubspot.com/l/api-key',
+    'intercom-api-key': 'Revoke: https://app.intercom.com/a/apps/_/settings/api-keys',
+    'jfrog-api-key': 'Revoke: https://jfrog.com/help/r/jfrog-platform-administration-documentation/api-keys',
+    'jfrog-identity-token': 'Revoke: https://jfrog.com/help/r/jfrog-platform-administration-documentation/access-tokens',
+    'kraken-access-token': 'Revoke: https://www.kraken.com/u/security/api',
+    'kucoin-access-token': 'Revoke: https://www.kucoin.com/account/api',
+    'kucoin-secret-key': 'Revoke: https://www.kucoin.com/account/api',
+    'launchdarkly-access-token': 'Revoke: https://app.launchdarkly.com/settings/authorization',
+    'lob-api-key': 'Revoke: https://dashboard.lob.com/settings/api-keys',
+    'lob-pub-api-key': 'Revoke: https://dashboard.lob.com/settings/api-keys',
+    'mailchimp-api-key': 'Revoke: https://us1.admin.mailchimp.com/account/api/',
+    'mattermost-access-token': 'Revoke: <your-mattermost-instance>/user/settings/security (Personal Access Tokens section)',
+    'messagebird-api-token': 'Revoke: https://dashboard.messagebird.com/en/developers/access',
+    'messagebird-client-id': 'Revoke: https://dashboard.messagebird.com/en/developers/access',
+    'netlify-access-token': 'Revoke: https://app.netlify.com/user/applications#personal-access-tokens',
+    'sendbird-access-id': 'Revoke: https://dashboard.sendbird.com/settings/general',
+    'sonar-api-token': 'Revoke: https://sonarcloud.io/account/security (SonarCloud) or https://<host>/account/security (SonarQube)',
+    'sourcegraph-access-token': 'Revoke: https://<your-sourcegraph-instance>/user/settings/tokens',
+    'squarespace-access-token': 'Revoke: https://account.squarespace.com/settings/connected-apps',
+    'travisci-access-token': 'Revoke: https://app.travis-ci.com/account/preferences (API Authentication -> Revoke Token)',
+    'twitch-api-token': 'Revoke: https://dev.twitch.tv/console/apps (Developer Console -> Manage app)',
+    'twitter-access-secret': 'Revoke: https://developer.twitter.com/en/portal/projects-and-apps (Keys and tokens)',
+    'twitter-access-token': 'Revoke: https://developer.twitter.com/en/portal/projects-and-apps (Keys and tokens)',
+    'twitter-api-key': 'Revoke: https://developer.twitter.com/en/portal/projects-and-apps (Keys and tokens)',
+    'twitter-api-secret': 'Revoke: https://developer.twitter.com/en/portal/projects-and-apps (Keys and tokens)',
+    'twitter-bearer-token': 'Revoke: https://developer.twitter.com/en/portal/projects-and-apps (Bearer Token -> Regenerate)',
+    'yandex-api-key': 'Rotate: https://console.cloud.yandex.com/iam (IAM -> Service accounts -> API keys)',
+    'yandex-aws-access-token': 'Rotate: https://console.cloud.yandex.com/iam (IAM -> Service accounts -> Static access keys)',
+    'yandex-oauth-access-token': 'Revoke: https://oauth.yandex.com/ (Manage tokens -> Revoke)',
 }
