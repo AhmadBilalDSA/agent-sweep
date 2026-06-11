@@ -1,8 +1,13 @@
-# agentsweep
+# AgentSweep
 
-Find and redact secrets (API keys, tokens, private keys, DB URLs) that got pasted into your AI coding agent's local history.
+> Find and redact secrets (API keys, tokens, private keys, DB URLs) that got pasted into your AI coding agent's local history.
 
-**Status:** alpha. Works on Claude Code today. Codex, Aider, Cursor, Continue via contributed `Source` adapters — see CONTRIBUTING.md.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/Ishannaik/agent-sweep)
+[![No runtime deps](https://img.shields.io/badge/dependencies-zero-brightgreen.svg)](pyproject.toml)
+
+**Status:** alpha. Works on Claude Code today. Codex, Aider, Cursor, Continue via contributed `Source` adapters — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## The problem
 
