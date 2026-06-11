@@ -1,21 +1,20 @@
 """Interactive mode: big banner + numbered actions.
 
 Forgiveness & confirmation: nothing destructive runs without an explicit
-typed confirmation, backups are always kept, and the undo action restores
-them. Flags/pipes bypass this module entirely (see cli.main).
+typed confirmation, backups are always kept, and undo restores them.
+Flags/pipes bypass this module entirely (see cli.main).
 
-Menu actions invoke cli.main with curated flag lists — zero duplicated
-logic, and every action inherits the pipeline UI, safety gates, and exit
-codes. The import is lazy to avoid a cycle (cli imports this module).
+Menu actions invoke cli.main with verb argv — zero duplicated logic, and
+every action inherits the pipeline UI, safety gates, and exit codes. The
+imports are lazy to avoid a cycle (cli imports this module).
 """
 from __future__ import annotations
 
-import os
+import copy
 from pathlib import Path
 
 from . import __version__, ui
 from .pipeline import _suggest_paths
-from .sources import SOURCES
 
 
 def run_menu() -> int:
@@ -35,19 +34,19 @@ def run_menu() -> int:
             return 0
 
         if choice == "1":
-            main(["--source", "claude-code"])
+            main(["scan", "--source", "claude-code"])
         elif choice == "2":
-            main(["--source", "codex"])
+            main(["scan", "--source", "codex"])
         elif choice == "3":
             root = _ask_folder()
             if root is not None:
-                main(["--root", str(root)])
+                main(["scan", "--root", str(root)])
         elif choice == "4":
-            _menu_redact()
+            main(["fix", "--source", "claude-code"])
         elif choice == "5":
-            _menu_undo()
+            main(["undo", "--source", "claude-code"])
         elif choice == "6":
-            main(["--source", "claude-code", "--json"])
+            main(["scan", "--source", "claude-code", "--json"])
         elif choice in {"7", "q", "quit", "exit"}:
             return 0
         else:
@@ -91,19 +90,19 @@ def _ask_folder() -> Path | None:
     return None
 
 
-def _menu_redact() -> None:
-    ui.warn_line("This rewrites files under your Claude Code history in place.")
-    ui.warn_line("Every file gets a .bak backup; option 4 can undo afterwards.")
-    _confirm_and_fix("claude-code", None)
+def offer_redaction(args) -> int | None:
+    """After a scan shows live secrets, offer to redact them in place.
 
-
-def _confirm_and_fix(source: str, root: Path | None) -> int | None:
-    """Typed-confirmation redaction with a guided --force retry.
-
-    Returns the fix run's exit code, or None if the user backed out.
+    Calls pipeline.run directly (not back through the fix verb) so there's
+    no re-dispatch loop. Returns the redaction exit code, or None if the
+    user skipped. A typed REDACT confirmation is required; a blocked gate
+    prompts once for a --force override.
     """
-    from .cli import main
+    from .pipeline import run
 
+    print()
+    ui.warn_line("those keys are sitting in plain text — redact them now? "
+                 "(.bak backups kept; `agentsweep undo` reverts)")
     try:
         typed = input("  type REDACT to confirm (anything else cancels): ").strip()
     except (EOFError, KeyboardInterrupt):
@@ -113,59 +112,22 @@ def _confirm_and_fix(source: str, root: Path | None) -> int | None:
         ui.warn_line("cancelled — nothing was written")
         return None
 
-    argv = ["--source", source, "--fix", "--allow-production"]
-    if root is not None:
-        argv += ["--root", str(root)]
-    code = main(argv)
-    if code != 2:
-        return code
-    # A safety gate refused (most likely: Claude Code is running, or the
-    # files were written moments ago).
-    try:
-        retry = input(
-            "  a safety gate blocked the redaction (see above).\n"
-            "  override with --force? Only safe if no agent session is "
-            "actively writing. [y/N]: "
-        ).strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        print()
-        return code
-    if retry == "y":
-        return main(argv + ["--force"])
-    return code
-
-
-def offer_redaction(args) -> int | None:
-    """Post-scan offer: the report just showed live secrets — fix them now.
-
-    Returns the fix run's exit code, or None if the user skipped.
-    """
-    print()
-    ui.warn_line("those keys are sitting in plain text — you can redact "
-                 "them right now (.bak backups kept)")
-    return _confirm_and_fix(args.source, args.root)
-
-
-def _menu_undo() -> None:
-    source = SOURCES["claude-code"]()
-    backups = sorted(source.root.rglob("*.jsonl.bak")) if source.root.exists() else []
-    if not backups:
-        ui.warn_line(f"no .bak backups found under {source.root}")
-        return
-    print(f"  {len(backups)} backup(s) found under {source.root}")
-    try:
-        confirm = input(
-            "  restore them over the redacted files? [y/N]: ").strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        print()
-        return
-    if confirm != "y":
-        ui.warn_line("cancelled — backups kept as-is")
-        return
-    for bak in backups:
-        original = bak.with_name(bak.name[: -len(".bak")])
+    fix_args = copy.copy(args)
+    fix_args.fix = True
+    # A typed, interactive confirmation IS the alpha-stage opt-in.
+    fix_args.allow_production = True
+    code = run(fix_args)
+    if code == 2 and not fix_args.force:
         try:
-            os.replace(bak, original)
-            ui.redact_row("ok", ui.rel(original, source.root), "restored from .bak")
-        except OSError as e:
-            ui.redact_row("fail", ui.rel(bak, source.root), str(e))
+            retry = input(
+                "  a safety gate blocked the redaction (see above).\n"
+                "  override with --force? Only safe if no agent session is "
+                "actively writing. [y/N]: "
+            ).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return code
+        if retry == "y":
+            fix_args.force = True
+            return run(fix_args)
+    return code

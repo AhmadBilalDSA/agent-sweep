@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 from . import __version__, ui
+from . import ignore as ignore_mod
 from .preflight import is_agent_running, is_production_root
 from .redactor import SafetyError, safe_write, safety_check
 from .scanner import ROTATION_GUIDANCE, Finding, scan_text
@@ -20,6 +21,20 @@ from .sources import SOURCES, Source
 
 REDACT_TEMPLATE = "[REDACTED:{rule}]"
 
+# Above this many findings, a human-mode table is capped and the full set
+# is written to a report file so a 900-file scan can't bury the scrollback.
+MAX_TABLE_ROWS = 40
+# Above this many findings, `--json` to a real terminal auto-saves to a
+# file instead of flooding stdout.
+JSON_FLOOD_LIMIT = 30
+DEFAULT_JSON_NAME = "agentsweep-findings.json"
+DEFAULT_REPORT_NAME = "agentsweep-report.txt"
+
+
+def _opt(args, name: str, default=None):
+    """Tolerate namespaces from older call sites that lack new fields."""
+    return getattr(args, name, default)
+
 
 def run(args) -> int:
     """Execute one scan (and optional redact) run. Exit codes:
@@ -27,6 +42,7 @@ def run(args) -> int:
     """
     source_cls = SOURCES[args.source]
     source: Source = source_cls(root=args.root) if args.root else source_cls()
+    output: Path | None = _opt(args, "output")
 
     if args.root is not None and not source.root.exists():
         print(f"Path not found: {source.root}", file=sys.stderr)
@@ -49,23 +65,37 @@ def run(args) -> int:
                      f"no history files under {source.root}", err=True)
         return 0
 
+    ignores = (ignore_mod.IgnoreSet() if _opt(args, "no_ignore")
+               else ignore_mod.load([source.root, Path.cwd()]))
+
     if args.json:
-        found_by_file, _ = _scan_all(source, files)
-        _emit_json(found_by_file)
-        return 0 if not found_by_file else 1
+        found_by_file, _, suppressed = _scan_all(source, files, ignores=ignores)
+        return _output_json(found_by_file, source, output, suppressed)
 
     ui.stage(1, "ok", "DISCOVER", source.name, f"{len(files)} file(s)", source.root)
 
     t0 = time.perf_counter()
     with ui.scan_progress(len(files)) as progress:
-        found_by_file, strings_scanned = _scan_all(
-            source, files,
+        # detection() is provided by the live-feed progress renderer; guard
+        # it so the pipeline stays decoupled from the exact progress API.
+        _detect = getattr(progress, "detection", None)
+
+        def _on_finding(f: Finding) -> None:
+            if _detect is not None:
+                _detect(f.display, f.masked,
+                        f"{ui.rel(f.file, source.root)}:{f.line}")
+        found_by_file, strings_scanned, suppressed = _scan_all(
+            source, files, ignores=ignores,
             on_file=lambda f: progress.advance(ui.rel(f, source.root)),
+            on_finding=_on_finding,
         )
     elapsed = time.perf_counter() - t0
 
     ui.stage(2, "ok", "SCAN", f"{len(files)} file(s)",
              f"{strings_scanned} string(s)", f"{elapsed:.1f}s")
+
+    if suppressed:
+        ui.warn_line(f"{suppressed} finding(s) suppressed by .agentsweepignore")
 
     if not found_by_file:
         ui.stage(3, "ok", "FINDINGS", "no secrets found")
@@ -75,7 +105,7 @@ def run(args) -> int:
 
     total = sum(len(v) for v in found_by_file.values())
     ui.stage(3, "fail", "FINDINGS", f"{total} secret(s) in {len(found_by_file)} file(s)")
-    ui.findings_table(_table_rows(found_by_file), source.root)
+    _show_findings(found_by_file, source, output)
 
     if not args.fix:
         ui.stage(4, "skip", "REDACT",
@@ -133,21 +163,32 @@ def _suggest_paths(missing: Path) -> list[str]:
 def _scan_all(
     source: Source,
     files: list[Path],
+    ignores=None,
     on_file=None,
-) -> tuple[dict[Path, list[tuple[int, list, str, Finding]]], int]:
+    on_finding=None,
+) -> tuple[dict[Path, list[tuple[int, list, str, Finding]]], int, int]:
     out: dict[Path, list[tuple[int, list, str, Finding]]] = {}
     strings_scanned = 0
+    suppressed = 0
     for f in files:
         if on_file is not None:
             on_file(f)
+        relpath = ui.rel(f, source.root)
         for line_num, keypath, value in source.iter_strings(f):
             strings_scanned += 1
             for finding in scan_text(value):
                 finding.file = f
                 finding.line = line_num
                 finding.keypath = keypath
+                if ignores:
+                    fp = ignore_mod.fingerprint(relpath, line_num, finding.rule)
+                    if ignores.matches(finding.rule, finding.value, fp):
+                        suppressed += 1
+                        continue
                 out.setdefault(f, []).append((line_num, keypath, value, finding))
-    return out, strings_scanned
+                if on_finding is not None:
+                    on_finding(finding)
+    return out, strings_scanned, suppressed
 
 
 def _table_rows(found_by_file: dict) -> list[tuple[str, str, Path, int]]:
@@ -170,11 +211,13 @@ def _rotation_items(found_by_file: dict) -> list[tuple[str, str]]:
     ]
 
 
-def _emit_json(found_by_file: dict) -> None:
+def _json_payload(found_by_file: dict, source: Source) -> list[dict]:
     payload = []
     for path, items in found_by_file.items():
+        relpath = ui.rel(path, source.root)
         for line_num, keypath, _val, finding in items:
             payload.append({
+                "fingerprint": ignore_mod.fingerprint(relpath, line_num, finding.rule),
                 "file": str(path),
                 "line": line_num,
                 "keypath": keypath,
@@ -182,7 +225,120 @@ def _emit_json(found_by_file: dict) -> None:
                 "display": finding.display,
                 "masked": finding.masked,
             })
+    return payload
+
+
+def _output_json(found_by_file: dict, source: Source, output: Path | None,
+                 suppressed: int) -> int:
+    """Emit JSON. With -o (or a flood-risk tty) write to a file and keep
+    stdout/scrollback clean; otherwise print to stdout for piping."""
+    payload = _json_payload(found_by_file, source)
+    code = 0 if not payload else 1
+
+    if output is not None:
+        _write_text(output, json.dumps(payload, indent=2) + "\n")
+        print(f"{len(payload)} finding(s) written to {output}", file=sys.stderr)
+        return code
+
+    flood = (len(payload) > JSON_FLOOD_LIMIT
+             and getattr(sys.stdout, "isatty", lambda: False)())
+    if flood:
+        target = Path.cwd() / DEFAULT_JSON_NAME
+        _write_text(target, json.dumps(payload, indent=2) + "\n")
+        print(f"{len(payload)} findings — too many to print; written to "
+              f"{target}\n  view with:  cat {DEFAULT_JSON_NAME} | "
+              f"python -m json.tool   (or open it)", file=sys.stderr)
+        return code
+
     print(json.dumps(payload, indent=2))
+    if suppressed:
+        print(f"({suppressed} suppressed by .agentsweepignore)", file=sys.stderr)
+    return code
+
+
+def _show_findings(found_by_file: dict, source: Source,
+                   output: Path | None) -> None:
+    """Human findings table — capped on a real terminal so a huge scan can't
+    bury the screen; the full set always goes to a report file in that case
+    (or to -o if given)."""
+    rows = _table_rows(found_by_file)
+    on_tty = ui.console.is_terminal
+    capped = on_tty and len(rows) > MAX_TABLE_ROWS
+
+    if output is not None:
+        _write_text(output, json.dumps(_json_payload(found_by_file, source),
+                                       indent=2) + "\n")
+
+    if capped:
+        ui.findings_table(rows[:MAX_TABLE_ROWS], source.root)
+        report = output if output is not None else Path.cwd() / DEFAULT_REPORT_NAME
+        if output is None:
+            _write_text(report, _text_report(found_by_file, source))
+        ui.warn_line(f"…and {len(rows) - MAX_TABLE_ROWS} more — full list "
+                     f"written to {report}")
+    else:
+        ui.findings_table(rows, source.root)
+        if output is not None:
+            ui.warn_line(f"{len(rows)} finding(s) also written to {output}")
+
+
+def _text_report(found_by_file: dict, source: Source) -> str:
+    lines = ["agentsweep findings report", ""]
+    for item in _json_payload(found_by_file, source):
+        lines.append(f"{item['fingerprint']}")
+        lines.append(f"    {item['display']}  {item['masked']}")
+    lines.append("")
+    lines.append("Rotate these — see the provider URLs printed by the scan.")
+    return "\n".join(lines) + "\n"
+
+
+def _write_text(path: Path, text: str) -> None:
+    try:
+        path.write_text(text, encoding="utf-8")
+    except OSError as e:
+        print(f"Could not write {path}: {e}", file=sys.stderr)
+
+
+def undo(args) -> int:
+    """Restore *.jsonl.bak backups over their redacted files.
+
+    Scriptable: prompts for confirmation only on an interactive terminal.
+    Exit 0 on success or nothing-to-do, 2 if any restore failed.
+    """
+    source_cls = SOURCES[args.source]
+    source: Source = source_cls(root=args.root) if args.root else source_cls()
+    if not source.root.exists():
+        print(f"No history root at {source.root}", file=sys.stderr)
+        return 0
+    backups = sorted(source.root.rglob("*.jsonl.bak"))
+    if not backups:
+        print(f"No .bak backups found under {source.root}", file=sys.stderr)
+        return 0
+
+    interactive = (sys.stdin.isatty() and ui.console.is_terminal
+                   if hasattr(sys.stdin, "isatty") else False)
+    if interactive:
+        print(f"  {len(backups)} backup(s) found under {source.root}")
+        try:
+            if input("  restore them over the redacted files? [y/N]: "
+                     ).strip().lower() != "y":
+                ui.warn_line("cancelled — backups kept as-is")
+                return 0
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return 0
+
+    errors = 0
+    for bak in backups:
+        original = bak.with_name(bak.name[: -len(".bak")])
+        try:
+            import os
+            os.replace(bak, original)
+            ui.redact_row("ok", ui.rel(original, source.root), "restored from .bak")
+        except OSError as e:
+            ui.redact_row("fail", ui.rel(bak, source.root), str(e))
+            errors += 1
+    return 0 if errors == 0 else 2
 
 
 def _redact_all(
