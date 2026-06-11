@@ -1,4 +1,4 @@
-"""Contract tests for the pipeline UI: --json purity, exit codes, masking,
+﻿"""Contract tests for the pipeline UI: --json purity, exit codes, masking,
 gate rendering, redact rows, and encoding degradation."""
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from agentsweep import cli, ui  # noqa: E402
+from agentsweep import cli, pipeline, ui  # noqa: E402
 from agentsweep.cli import main  # noqa: E402
 
 
@@ -38,7 +38,7 @@ def _isolated_home(tmp_path, monkeypatch):
 @pytest.fixture
 def _no_claude(monkeypatch):
     """Make the running-process gate deterministic (we test it explicitly)."""
-    monkeypatch.setattr(cli, "is_claude_code_running", lambda: (False, ""))
+    monkeypatch.setattr(pipeline, "is_claude_code_running", lambda: (False, ""))
 
 
 def _mkroot(tmp_path: Path, content: str = FIXTURE_LINE) -> Path:
@@ -165,7 +165,7 @@ def test_production_gate_blocks_and_still_shows_rotation(
 
 def test_active_session_gate_blocks(tmp_path, monkeypatch, capsys):
     root = _mkroot(tmp_path)
-    monkeypatch.setattr(cli, "is_claude_code_running",
+    monkeypatch.setattr(pipeline, "is_claude_code_running",
                         lambda: (True, "claude.exe"))
 
     code = main(["--root", str(root), "--fix"])
@@ -180,7 +180,7 @@ def test_active_session_gate_blocks(tmp_path, monkeypatch, capsys):
 
 def test_force_overrides_active_session_gate(tmp_path, monkeypatch, capsys):
     root = _mkroot(tmp_path)
-    monkeypatch.setattr(cli, "is_claude_code_running",
+    monkeypatch.setattr(pipeline, "is_claude_code_running",
                         lambda: (True, "claude.exe"))
 
     code = main(["--root", str(root), "--fix", "--force"])
@@ -375,7 +375,7 @@ def _raise_interrupt(*args, **kwargs):
 
 def test_ctrl_c_mid_scan_exits_130_no_traceback(tmp_path, monkeypatch, capsys):
     root = _mkroot(tmp_path)
-    monkeypatch.setattr(cli, "_scan_all", _raise_interrupt)
+    monkeypatch.setattr(pipeline, "_scan_all", _raise_interrupt)
     code = main(["--root", str(root)])
     captured = capsys.readouterr()
 
@@ -387,7 +387,7 @@ def test_ctrl_c_mid_scan_exits_130_no_traceback(tmp_path, monkeypatch, capsys):
 def test_ctrl_c_during_fix_reassures_about_backups(
         tmp_path, monkeypatch, _no_claude, capsys):
     root = _mkroot(tmp_path)
-    monkeypatch.setattr(cli, "_redact_all", _raise_interrupt)
+    monkeypatch.setattr(pipeline, "_redact_all", _raise_interrupt)
     code = main(["--root", str(root), "--fix", "--force"])
     captured = capsys.readouterr()
 
@@ -398,7 +398,7 @@ def test_ctrl_c_during_fix_reassures_about_backups(
 
 def test_ctrl_c_json_mode_keeps_stdout_clean(tmp_path, monkeypatch, capsys):
     root = _mkroot(tmp_path)
-    monkeypatch.setattr(cli, "_scan_all", _raise_interrupt)
+    monkeypatch.setattr(pipeline, "_scan_all", _raise_interrupt)
     code = main(["--root", str(root), "--json"])
     captured = capsys.readouterr()
 
