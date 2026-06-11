@@ -3,7 +3,7 @@
 > Find and redact secrets (API keys, tokens, private keys, DB URLs) that got pasted into your AI coding agent's local history.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/Ishannaik/agent-sweep)
 
 **Status:** alpha. Works on Claude Code today. Codex, Aider, Cursor, Continue via contributed `Source` adapters — see [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -20,7 +20,7 @@ Claude Code (and every other AI coding CLI) stores your full conversation histor
 pip install agentsweep
 ```
 
-Requires Python 3.10+. One dependency: [`rich`](https://github.com/Textualize/rich), for the pipeline terminal UI. Output degrades to plain text automatically when piped, and `--json` is always styling-free.
+Requires Python 3.11+. One dependency: [`rich`](https://github.com/Textualize/rich), for the pipeline terminal UI. Output degrades to plain text automatically when piped, and `--json` is always styling-free.
 
 ## Usage
 
@@ -88,7 +88,7 @@ mv session.jsonl.bak session.jsonl
 
 ## What's detected
 
-~20 high-confidence patterns: AWS access keys, GitHub tokens (PAT/OAuth/App/fine-grained), Stripe live/test, OpenAI, Anthropic, Google API, Slack bot/user/webhook, Hugging Face, JWT, PEM private keys, DB URLs with embedded passwords, npm/PyPI/SendGrid/Twilio tokens. Patterns are high-precision — false positives are rare.
+131 high-confidence patterns: AWS access keys, GitHub tokens (PAT/OAuth/App/fine-grained), Stripe live/test, OpenAI, Anthropic, Google API, Slack bot/user/webhook, Hugging Face, JWT, PEM private keys, DB URLs with embedded passwords, npm/PyPI/SendGrid/Twilio tokens — plus 109 rules ported from the [gitleaks](https://github.com/gitleaks/gitleaks) pack covering GitLab, Grafana, HashiCorp Vault/Terraform, DigitalOcean, Shopify, PlanetScale, Databricks, Atlassian, Azure AD, 1Password, Sentry, New Relic, Mailgun, curl credentials on the command line, and many more. Patterns are high-precision — false positives are rare.
 
 ## What's NOT detected
 

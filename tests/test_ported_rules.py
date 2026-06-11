@@ -1,0 +1,174 @@
+﻿"""Tests for the detection rules ported from the gitleaks rule pack.
+
+FIXTURES embeds one synthetic (non-live) example secret per ported rule and
+asserts the full scan pipeline -- including overlap dedupe -- attributes it
+to the right rule id.
+"""
+from __future__ import annotations
+
+import re
+import sys
+from types import SimpleNamespace
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+from agentsweep.scanner import ROTATION_GUIDANCE, RULES, scan_text  # noqa: E402
+
+
+# Fixture values are split into adjacent string literals on purpose:
+# the file must never contain a contiguous secret-shaped token, or
+# GitHub push protection (and other scanners) will flag the repo.
+FIXTURES: dict[str, str] = {
+    '1password-secret-key': 'A3-A1B2C3-D4E5F6-G7H' '8I-J9K0L-M1N2O-P3Q4R',
+    # NOTE: fixture extended to 252 chars after the prefix -- the upstream
+    # sample was 246, short of the regex's {250,} minimum.
+    '1password-service-account-token': 'ops_eyJ' + 'a1b2c3' * 42,
+    'adobe-client-secret': 'p8e-a1b2c3a1b2c3a1' 'b2c3a1b2c3a1b2c3d4',
+    'age-secret-key': 'AGE-SECRET-KEY-1QPZRY9X8GFQPZRY9X8GFQ' 'PZRY9X8GFQPZRY9X8GFQPZRY9X8GF2TVDW0S3',
+    'airtable-pat': 'patA1b2C3d4E5f6Gh.a1b2c3d4a1b2c3d4a1b2c3d' '4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4',
+    'alibaba-access-key-id': 'LTAIa1b2c3a1' 'b2c3a1b2c3d4',
+    'anthropic-admin-key': 'sk-ant-admin01-a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1bAA',
+    'artifactory-api-key': 'AKCpa1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1' 'b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3d4e',
+    'artifactory-reference-token': 'cmVmda1b2c3a1b2c3a1b2c3a1b2c3a1b' '2c3a1b2c3a1b2c3a1b2c3a1b2c3d4e5f',
+    'atlassian-api-token': 'ATATT3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3' 'a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3',
+    'authress-service-client-key': 'sc_a1b2c3d4e5.a1b2.acc_a1b2c3d4e5' 'f6.a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3',
+    'aws-bedrock-api-key-long-lived': 'ABSKa1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3',
+    'aws-bedrock-api-key-short-lived': 'bedrock-api-key-YmVkcm' '9jay5hbWF6b25hd3MuY29t',
+    'azure-ad-client-secret': 'abc1Q~a1b2c3a1b2c3' 'a1b2c3a1b2c3a1b2c3d',
+    'clickhouse-cloud-api-secret': '4b1da1b2c3a1b2c3a1b2c' '3a1b2c3a1b2c3a1b2c3d4',
+    'clojars-api-token': 'CLOJARS_a1b2c3a1b2c3a1b2c3a1b2c3a1' 'b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3',
+    'cloudflare-origin-ca-key': 'v1.0-a1b2c3a1b2c3a1b2c3a1b2c3-a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1',
+    'curl-auth-header': 'curl -H "Authorization: B' 'earer a1b2c3a1b2c3a1b2c3"',
+    'curl-auth-user': 'curl --user apiu' 'ser1:a1b2c3a1b2c3',
+    'databricks-api-token': 'dapia1b2c3a1b2c3a1' 'b2c3a1b2c3a1b2c3a1',
+    'defined-networking-api-token': 'dnkey-a1b2c3a1b2c3a1b2c3a1b2c3a1-a1b2c3a1b' '2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2',
+    'digitalocean-access-token': 'doo_v1_a1b2c3a1b2c3a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2',
+    'digitalocean-pat': 'dop_v1_a1b2c3a1b2c3a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2',
+    'digitalocean-refresh-token': 'dor_v1_a1b2c3a1b2c3a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2',
+    'doppler-api-token': 'dp.pt.a1b2c3a1b2c3a1b2c3' 'a1b2c3a1b2c3a1b2c3a1b2c3a',
+    'duffel-api-token': 'duffel_test_a1b2c3a1b2c3a1b' '2c3a1b2c3a1b2c3a1b2c3a1b2c3a',
+    'dynatrace-api-token': 'dt0c01.a1b2c3a1b2c3a1b2c3a1b2c3.a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2',
+    'easypost-api-token': 'EZAKa1b2c3a1b2c3a1b2c3a1b2c3a' '1b2c3a1b2c3a1b2c3a1b2c3a1b2c3',
+    'easypost-test-api-token': 'EZTKa1b2c3a1b2c3a1b2c3a1b2c3a' '1b2c3a1b2c3a1b2c3a1b2c3a1b2c3',
+    'facebook-page-token': 'EAAMa1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a' '1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3',
+    'flutterwave-encryption-key': 'FLWSECK_TEST' '-a1b2c3a1b2c3',
+    'flutterwave-public-key': 'FLWPUBK_TEST-a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3ab-X',
+    'flutterwave-secret-key': 'FLWSECK_TEST-a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3ab-X',
+    'flyio-token': 'fo1_a1b2c3a1b2c3a1b2c3a' '1b2c3a1b2c3a1b2c3a1b2c3d',
+    'frameio-token': 'fio-u-a1b2c3a1b2c3a1b2c3a1b2c3a1b2c' '3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2',
+    'github-refresh-token': 'ghr_a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3',
+    'gitlab-cicd-job-token': 'glcbt-64_a1b2c' '3a1b2c3a1b2c3ab',
+    'gitlab-deploy-token': 'gldt-a1b2c3a' '1b2c3a1b2c3ab',
+    'gitlab-feature-flag-client-token': 'glffct-a1b2c3' 'a1b2c3a1b2c3ab',
+    'gitlab-feed-token': 'glft-a1b2c3a' '1b2c3a1b2c3ab',
+    'gitlab-incoming-mail-token': 'glimt-a1b2c3a1b' '2c3a1b2c3a1b2c3d',
+    'gitlab-kubernetes-agent-token': 'glagent-a1b2c3a1b2c3a1b2c3a1b' '2c3a1b2c3a1b2c3a1b2c3a1b2c3de',
+    'gitlab-oauth-app-secret': 'gloas-a1b2c3a1b2c3a1b2c3a1b2c3a1b2c' '3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2',
+    'gitlab-pat': 'glpat-a1b2c3a' '1b2c3a1b2c3ab',
+    'gitlab-pat-routable': 'glpat-a1b2c3a1b2c3a1b2c' '3a1b2c3a1b2c3.a1b2c3a1b',
+    'gitlab-pipeline-trigger': 'glptt-a1b2c3a1b2c3a1b2c' '3a1b2c3a1b2c3a1b2c3a1b2',
+    'gitlab-runner-registration': 'GR1348941a1b2c' '3a1b2c3a1b2c3a1',
+    'gitlab-runner-auth': 'glrt-a1b2c3a' '1b2c3a1b2c3a1',
+    'gitlab-runner-auth-routable': 'glrt-t1_a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3.a1b2c3a1b',
+    'gitlab-scim': 'glsoat-a1b2c3' 'a1b2c3a1b2c3a1',
+    'gitlab-session-cookie': '_gitlab_session=a1b2c3a1' 'b2c3a1b2c3a1b2c3a1b2c3a1',
+    'grafana-api-key': 'eyJrIjoia1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1' 'b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3',
+    'grafana-cloud-token': 'glc_a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3',
+    'grafana-service-account': 'glsa_a1b2c3a1b2c3a1b2c3' 'a1b2c3a1b2c3a1_a1b2c3a1',
+    'harness': 'pat.a1b2c3a1b2c3a1b2c3a1b2.a1b2c3a1b' '2c3a1b2c3a1b2c3.a1b2c3a1b2c3a1b2c3a1',
+    'terraform-api-token': 'a1b2c3a1b2c3a1.atlasv1.a1b2c3a1b2c3a1b2c3' 'a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3',
+    'heroku-api-key': 'HRKU-AAa1b2c3a1b2c3a1b2c3a1b2c3a' '1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2',
+    'huggingface-org': 'api_org_abcdefabcdefa' 'bcdefabcdefabcdefabcd',
+    'infracost': 'ico-a1b2c3a1b2c3a1' 'b2c3a1b2c3a1b2c3a1',
+    'intra42-client-secret': 's-s4t2ud-a1b2c3d4a1b2c3d4a1b2c3d4a1b' '2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4',
+    'jwt-base64': 'ZXlKaGJHY2lPaUa1b2c3a1b2c3a1b2c' '3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3',
+    'linear-api-key': 'lin_api_a1b2c3d4e5a1b2c3' 'd4e5a1b2c3d4e5a1b2c3d4e5',
+    'mailgun-private-token': 'mailgun_key = key-a1b2c3d' '4e5f6a1b2c3d4e5f6a1b2c3d4',
+    'mailgun-public-key': 'mailgun_pubkey = pubkey-a1b2' 'c3d4e5f6a1b2c3d4e5f6a1b2c3d4',
+    'mailgun-signing-key': 'mailgun_signing_key = a1b2c3d4a1b2c3' 'd4a1b2c3d4a1b2c3d4-a1b2c3d4-a1b2c3d4',
+    'mapbox-api-token': 'pk.a1b2c3d4e5a1b2c3d4e5a1b2c3d4e5a1b2c3d4e5' 'a1b2c3d4e5a1b2c3d4e5.a1b2c3d4e5a1b2c3d4e5f6',
+    'maxmind-license-key': 'a1b2c3_a1b2c3d4e5a1b' '2c3d4e5f6a7b8c1d_mmk',
+    'microsoft-teams-webhook': 'https://contoso0.webhook.office.com/webhookb2/a1b2c3d4-a1b2-c3d4-e5f6-a1b2c3d4e5f6@a1b2c3d4-a1b2-c3d4-' 'e5f6-a1b2c3d4e5f6/IncomingWebhook/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4/a1b2c3d4-a1b2-c3d4-e5f6-a1b2c3d4e5f6',
+    'new-relic-browser-token': 'NRJS-a1b2c3d' '4e5f6a1b2c3d',
+    'new-relic-insert-key': 'NRII-a1b2c3d4a1b2c' '3d4a1b2c3d4a1b2c3d4',
+    'new-relic-user-key': 'NRAK-a1b2c3d4e5a' '1b2c3d4e5f6a7b8c',
+    'notion-api-token': 'ntn_12345678901a1b2c3d4e5' 'a1b2c3d4e5a1b2c3d4e5f6a7b',
+    'octopus-deploy-api-key': 'API-A1B2C3D4E5A' '1B2C3D4E5F6A7B8',
+    'openshift-user-token': 'sha256~a1b2c3d4e5a1b2c3d4' 'e5a1b2c3d4e5a1b2c3d4e5f6a',
+    'perplexity-api-key': 'pplx-a1b2c3a1b2c3a1b2c3a1b' '2c3a1b2c3a1b2c3a1b2c3a1b2c3',
+    'plaid-access-token': 'access-sandbox-a1b2c3d4-a' '1b2-c3d4-e5f6-a1b2c3d4e5f6',
+    'planetscale-api-token': 'pscale_tkn_a1b2c3a1b2c3' 'a1b2c3a1b2c3a1b2c3a1b2c3',
+    'planetscale-oauth-token': 'pscale_oauth_a1b2c3a1b2c' '3a1b2c3a1b2c3a1b2c3a1b2c3',
+    'planetscale-password': 'pscale_pw_a1b2c3a1b2c3a' '1b2c3a1b2c3a1b2c3a1b2c3',
+    'postman-api-key': 'PMAK-a1b2c3a1b2c3a1b2c3a1b2c3-a1' 'b2c3a1b2c3a1b2c3a1b2c3a1b2c3d4e5',
+    'prefect-api-key': 'pnu_a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3',
+    'pulumi-access-token': 'pul-a1b2c3a1b2c3a1b2c3' 'a1b2c3a1b2c3a1b2c3d4e5',
+    'readme-api-token': 'rdme_a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1' 'b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3d4e5',
+    'rubygems-api-key': 'rubygems_a1b2c3a1b2c3a1b2c3a' '1b2c3a1b2c3a1b2c3a1b2c3a1b2c3',
+    'scalingo-api-token': 'tk-us-a1b2c3a1b2c3a1b2c3a1b' '2c3a1b2c3a1b2c3a1b2c3a1b2c3',
+    'sendinblue-api-key': 'xkeysib-a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3' 'a1b2c3a1b2c3a1b2c3a1b2c3d4e5-a1b2c3d4e5f6a1b2',
+    'sentry-org-token': 'sntrys_eyJpYXQiOa1b2c3d4e5LCJyZWdpb25fdXJsa1b2c3' 'd4e5_a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3d',
+    'sentry-user-token': 'sntryu_a1b2c3a1b2c3a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3d4e5',
+    'settlemint-app-token': 'sm_aat_a1b2' 'c3d4e5f6a1b2',
+    'settlemint-pat': 'sm_pat_a1b2' 'c3a1b2c3a1b2',
+    'settlemint-sat': 'sm_sat_a1b2' 'c3a1b2c3a1b2',
+    'shippo': 'shippo_test_a1b2c3a1b2c3a1' 'b2c3a1b2c3a1b2c3a1b2c3a1b2',
+    'shopify-access-token': 'shpat_a1b2c3a1b2c3a' '1b2c3a1b2c3a1b2c3a1',
+    'shopify-custom-access-token': 'shpca_a1b2c3a1b2c3a' '1b2c3a1b2c3a1b2c3a1',
+    'shopify-private-app-token': 'shppa_a1b2c3a1b2c3a' '1b2c3a1b2c3a1b2c3a1',
+    'shopify-shared-secret': 'shpss_a1b2c3a1b2c3a' '1b2c3a1b2c3a1b2c3a1',
+    'sidekiq-secret': 'BUNDLE_ENTERPRISE__CONTRIB' 'SYS__COM=a1b2c3d4:a1b2c3d4',
+    'sidekiq-sensitive-url': 'https://a1b2c3d4:a1b2c3' 'd4@gems.contribsys.com/',
+    'slack-app-token': 'xapp-1-A1B2C3D4E5F-1234567890123-a1b2c3a1b2c3a1b' '2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2',
+    'slack-config-access-token': 'xoxe.xoxp' '-1-' 'A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2' 'C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1',
+    'slack-config-refresh-token': 'xoxe' '-1-' 'A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B' '2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1B2C3A1',
+    'slack-legacy-token': 'xoxs-1234567890-1234567890-12345678' '90-a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1',
+    'slack-legacy-workspace-token': 'xoxa-1-a1b2c3a1' 'b2c3a1b2c3a1b2c3',
+    'snyk': 'SNYK_TOKEN=a1b2c3d4-a1b' '2-c3d4-a1b2-c3d4a1b2c3d4',
+    'square-access-token': 'sq0atp-a1b2c3a' '1b2c3a1b2c3a1b2',
+    'telegram-bot-token': '1234567890:Aa1b2c3a1b2c' '3a1b2c3a1b2c3a1b2c3a1b2',
+    'typeform-token': 'tfp_a1b2c3a1b2c3a1b2c3a1b2c3a1b' '2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c',
+    'vault-batch-token': 'hvb.a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a' '1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3',
+    'vault-service-token': 'hvs.a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a' '1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3',
+}
+
+
+@pytest.mark.parametrize("rule_id", sorted(FIXTURES))
+def test_ported_rule_detects_its_fixture(rule_id: str) -> None:
+    found = {f.rule for f in scan_text(FIXTURES[rule_id])}
+    assert rule_id in found, (
+        f"{rule_id} not reported for its fixture; got {sorted(found) or 'nothing'}"
+    )
+
+
+def test_every_rule_compiles_and_ids_are_unique() -> None:
+    ids = [rule_id for rule_id, _display, _pattern in RULES]
+    assert len(ids) == len(set(ids)), "duplicate rule ids in RULES"
+    for rule_id, display, pattern in RULES:
+        assert isinstance(pattern, re.Pattern), f"{rule_id}: pattern not compiled"
+        assert rule_id and display
+
+
+def test_rotation_guidance_present_or_cli_default_applies() -> None:
+    from agentsweep.pipeline import _rotation_items
+
+    # The CLI falls back to a generic message for rules without guidance,
+    # so a missing entry degrades gracefully rather than crashing...
+    found_by_file = {"f.jsonl": [(1, [], "v", SimpleNamespace(rule="no-such-rule"))]}
+    assert _rotation_items(found_by_file) == [
+        ("no-such-rule", "rotate via the issuing provider")
+    ]
+
+    # ...but every ported rule must ship provider-specific guidance,
+    missing_ported = sorted(r for r in FIXTURES if r not in ROTATION_GUIDANCE)
+    assert not missing_ported, f"ported rules lacking guidance: {missing_ported}"
+
+    # and right now every shipped rule has an explicit entry.
+    rule_ids = {rule_id for rule_id, _d, _p in RULES}
+    missing = sorted(rule_ids - set(ROTATION_GUIDANCE))
+    assert not missing, f"rules lacking guidance: {missing}"
+    stale = sorted(set(ROTATION_GUIDANCE) - rule_ids)
+    assert not stale, f"guidance for rules that no longer exist: {stale}"
