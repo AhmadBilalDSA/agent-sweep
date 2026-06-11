@@ -19,6 +19,19 @@ Claude Code (and every other AI coding CLI) stores your full conversation histor
 
 > **Scope of protection:** agentsweep itself is fully local and offline — it reads and writes only files on your machine and makes zero network calls. It removes one attack vector: secrets sitting in local history files. It does not affect what your AI provider already received: when you paste a key into Claude Code, Cursor, or any cloud-backed agent, that key already transited the provider's servers before it hit disk. If that concerns you, consider a locally-hosted model (Ollama, LM Studio, OpenCode) where nothing leaves your machine at all — agentsweep pairs especially well with local-model setups.
 
+## Why this matters right now
+
+Supply chain attacks are accelerating. In 2024–2025 a wave of malicious npm and PyPI packages — `sha256-universal`, `shailulid`, hundreds of typosquats — were caught doing one thing: **exfiltrating developer credentials off the machine that installed them**. They target environment variables, `.env` files, shell history, SSH keys, and now AI agent history files.
+
+AI coding assistants have created a new category of credential exposure that didn't exist two years ago:
+
+- You paste a production API key into Claude Code to debug something → it's now in `~/.claude/projects/*/conversations/*.jsonl` forever
+- A compromised npm package runs `postinstall` → scans common paths → finds your JSONL history → exfiltrates 50 API keys in one request
+- You rotate the key you used in public but forget the dozen others in your history
+- Meanwhile your history grows: every `.env` you asked an AI to help with, every DB URL you shared for debugging, every token you pasted for a one-liner
+
+**AI agent history is the new `.bash_history` — except it contains full context, not just commands.** The attack tooling already knows this. `agentsweep` exists to clean up before it's exploited.
+
 ## Install
 
 ```bash
