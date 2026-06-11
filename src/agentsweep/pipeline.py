@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 from . import __version__, ui
-from .preflight import is_claude_code_running, is_production_root
+from .preflight import is_agent_running, is_production_root
 from .redactor import SafetyError, safe_write, safety_check
 from .scanner import ROTATION_GUIDANCE, Finding, scan_text
 from .sources import SOURCES, Source
@@ -236,19 +236,19 @@ def _preflight_gates(source: Source, source_cls: type[Source], args) -> int | No
         ])
         return 2
 
-    running, marker = is_claude_code_running()
+    running, marker = is_agent_running(source.process_markers)
     if running and not args.force:
         ui.stage(4, "fail", "REDACT", "blocked by safety gate")
         ui.gate_panel("active session gate", [
-            f"Claude Code appears to be running (marker: {marker!r}).",
-            "Close all Claude Code sessions before --fix,",
+            f"{source.display_name} appears to be running (marker: {marker!r}).",
+            f"Close all {source.display_name} sessions before --fix,",
             "or pass --force to proceed anyway.",
         ])
         return 2
     if running and args.force:
         ui.warn_line(
-            f"--force: proceeding while Claude Code appears to be running "
-            f"(marker: {marker!r})"
+            f"--force: proceeding while {source.display_name} appears to be "
+            f"running (marker: {marker!r})"
         )
 
     return None

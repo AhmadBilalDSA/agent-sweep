@@ -38,7 +38,7 @@ def _isolated_home(tmp_path, monkeypatch):
 @pytest.fixture
 def _no_claude(monkeypatch):
     """Make the running-process gate deterministic (we test it explicitly)."""
-    monkeypatch.setattr(pipeline, "is_claude_code_running", lambda: (False, ""))
+    monkeypatch.setattr(pipeline, "is_agent_running", lambda markers: (False, ""))
 
 
 def _mkroot(tmp_path: Path, content: str = FIXTURE_LINE) -> Path:
@@ -165,8 +165,8 @@ def test_production_gate_blocks_and_still_shows_rotation(
 
 def test_active_session_gate_blocks(tmp_path, monkeypatch, capsys):
     root = _mkroot(tmp_path)
-    monkeypatch.setattr(pipeline, "is_claude_code_running",
-                        lambda: (True, "claude.exe"))
+    monkeypatch.setattr(pipeline, "is_agent_running",
+                        lambda markers: (True, "claude.exe"))
 
     code = main(["--root", str(root), "--fix"])
     captured = capsys.readouterr()
@@ -180,8 +180,8 @@ def test_active_session_gate_blocks(tmp_path, monkeypatch, capsys):
 
 def test_force_overrides_active_session_gate(tmp_path, monkeypatch, capsys):
     root = _mkroot(tmp_path)
-    monkeypatch.setattr(pipeline, "is_claude_code_running",
-                        lambda: (True, "claude.exe"))
+    monkeypatch.setattr(pipeline, "is_agent_running",
+                        lambda markers: (True, "claude.exe"))
 
     code = main(["--root", str(root), "--fix", "--force"])
     captured = capsys.readouterr()
@@ -283,7 +283,7 @@ def test_no_args_non_tty_keeps_scan_behavior(tmp_path, _isolated_home, capsys):
 
 
 def test_menu_renders_and_quits(monkeypatch, _isolated_home, capsys):
-    _feed_menu(monkeypatch, ["6"])
+    _feed_menu(monkeypatch, ["7"])
     assert main([]) == 0
     out = capsys.readouterr().out
     assert "MENU" in out
@@ -304,10 +304,10 @@ def test_menu_folder_typo_then_retry_shows_count(
     good.mkdir()
     (good / "s.jsonl").write_text(FIXTURE_LINE, encoding="utf-8")
 
-    # 2 → typo (suggestion shown) → corrected path (count shown, scan runs)
-    # → Enter skips the post-scan redaction offer → Enter → 6 quit.
-    _feed_menu(monkeypatch, ["2", str(tmp_path / "histori"), str(good), "", "",
-                             "6"])
+    # 3 → typo (suggestion shown) → corrected path (count shown, scan runs)
+    # → Enter skips the post-scan redaction offer → Enter → 7 quit.
+    _feed_menu(monkeypatch, ["3", str(tmp_path / "histori"), str(good), "", "",
+                             "7"])
     assert main([]) == 0
     captured = capsys.readouterr()
 
@@ -322,8 +322,8 @@ def test_menu_empty_folder_offers_scan_anyway(
     empty = tmp_path / "empty"
     empty.mkdir()
     # decline the scan-anyway offer twice more → _ask_folder gives up → menu → quit
-    _feed_menu(monkeypatch, ["2", str(empty), "n", str(empty), "n", str(empty),
-                             "n", "", "6"])
+    _feed_menu(monkeypatch, ["3", str(empty), "n", str(empty), "n", str(empty),
+                             "n", "", "7"])
     assert main([]) == 0
     out = capsys.readouterr().out
     assert "found 0 .jsonl file(s)" in out
@@ -331,7 +331,7 @@ def test_menu_empty_folder_offers_scan_anyway(
 
 
 def test_menu_invalid_choice_reprompts(monkeypatch, _isolated_home, capsys):
-    _feed_menu(monkeypatch, ["9", "6"])
+    _feed_menu(monkeypatch, ["9", "7"])
     assert main([]) == 0
     assert "unknown option" in capsys.readouterr().err
 
@@ -344,7 +344,7 @@ def test_menu_redact_requires_typed_confirmation(
     session.write_text(FIXTURE_LINE, encoding="utf-8")
 
     # "redact" (lowercase) is NOT the magic word — nothing must be written.
-    _feed_menu(monkeypatch, ["3", "redact", "", "6"])
+    _feed_menu(monkeypatch, ["4", "redact", "", "7"])
     assert main([]) == 0
     assert AWS_KEY in session.read_text(encoding="utf-8")
     assert not session.with_name("session.jsonl.bak").exists()
@@ -358,9 +358,9 @@ def test_menu_redact_confirmed_writes_and_undo_restores(
     session.write_text(FIXTURE_LINE, encoding="utf-8")
     original = session.read_text(encoding="utf-8")
 
-    # 3 → REDACT → (mtime gate refuses fresh file → exit 2) → y forces →
-    # Enter → 4 undo → y → Enter → 6 quit.
-    _feed_menu(monkeypatch, ["3", "REDACT", "y", "", "4", "y", "", "6"])
+    # 4 → REDACT → (mtime gate refuses fresh file → exit 2) → y forces →
+    # Enter → 5 undo → y → Enter → 7 quit.
+    _feed_menu(monkeypatch, ["4", "REDACT", "y", "", "5", "y", "", "7"])
     assert main([]) == 0
 
     restored = session.read_text(encoding="utf-8")

@@ -1,4 +1,4 @@
-"""Seed-phrase detector: BIP-39 checksum + Electrum HMAC validation."""
+﻿"""Seed-phrase detector: BIP-39 checksum + Electrum HMAC validation."""
 from __future__ import annotations
 
 import sys
@@ -85,8 +85,8 @@ def test_redaction_end_to_end(tmp_path, monkeypatch):
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("USERPROFILE", str(home))
-    monkeypatch.setattr(pipeline, "is_claude_code_running",
-                        lambda: (False, ""))
+    monkeypatch.setattr(pipeline, "is_agent_running",
+                        lambda markers: (False, ""))
 
     root = tmp_path / "history"
     root.mkdir()

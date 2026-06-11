@@ -37,19 +37,21 @@ def run_menu() -> int:
         if choice == "1":
             main(["--source", "claude-code"])
         elif choice == "2":
+            main(["--source", "codex"])
+        elif choice == "3":
             root = _ask_folder()
             if root is not None:
                 main(["--root", str(root)])
-        elif choice == "3":
-            _menu_redact()
         elif choice == "4":
-            _menu_undo()
+            _menu_redact()
         elif choice == "5":
+            _menu_undo()
+        elif choice == "6":
             main(["--source", "claude-code", "--json"])
-        elif choice in {"6", "q", "quit", "exit"}:
+        elif choice in {"7", "q", "quit", "exit"}:
             return 0
         else:
-            ui.warn_line(f"unknown option: {choice!r} — pick 1-6")
+            ui.warn_line(f"unknown option: {choice!r} — pick 1-7")
             continue
 
         try:

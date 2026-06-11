@@ -1,0 +1,4 @@
+{"timestamp":"2026-04-24T17:28:47.019Z","type":"session_meta","payload":{"id":"019dbf5b-56b6-7c12-92fb-b58cf2d382cf","cwd":"C:\\proj"}}
+{"timestamp":"2026-04-24T17:29:01.000Z","type":"event_msg","payload":{"type":"task_started"}}
+{"timestamp":"2026-04-24T17:29:04.500Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"deploy with key AKIAIOSFODNN7EXAMPLE thanks"}]}}
+{"timestamp":"2026-04-24T17:29:09.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"on it, deploying now"}]}}

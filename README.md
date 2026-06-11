@@ -6,11 +6,11 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/Ishannaik/agent-sweep)
 
-**Status:** alpha. Works on Claude Code today. Codex, Aider, Cursor, Continue via contributed `Source` adapters — see [CONTRIBUTING.md](CONTRIBUTING.md).
+**Status:** alpha. Works on **Claude Code** and **OpenAI Codex** today. Aider, Cursor, Continue via contributed `Source` adapters — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## The problem
 
-Claude Code (and every other AI coding CLI) stores your full conversation history as plain-text JSONL on disk — under `~/.claude/projects/` for Claude Code. Anything you paste — an AWS key, a `.env` file, a database URL — sits in clear text indefinitely. A typical dev's history accumulates dozens of secrets over months, often without them realizing.
+Claude Code (and every other AI coding CLI) stores your full conversation history as plain-text JSONL on disk — under `~/.claude/projects/` for Claude Code, `~/.codex/sessions/` for OpenAI Codex. Anything you paste — an AWS key, a `.env` file, a database URL — sits in clear text indefinitely. A typical dev's history accumulates dozens of secrets over months, often without them realizing.
 
 `agentsweep` scans that history, tells you what leaked, and can redact the secret values in place while preserving the JSONL structure byte-for-byte. It also tells you which keys to rotate, with the right revocation URL for each provider.
 
@@ -44,6 +44,7 @@ Scan (read-only, safe):
 
 ```
 agentsweep --source claude-code
+agentsweep --source codex
 ```
 
 Redact in place (creates `.bak` backups):
@@ -101,7 +102,7 @@ The patterns: AWS access keys, GitHub tokens (PAT/OAuth/App/fine-grained), Strip
 - Secrets split across multiple messages.
 - Anything inside a binary/non-UTF-8 file.
 
-For deeper detection, run `gitleaks` or `trufflehog` alongside agentsweep — their rule packs are more exhaustive. agentsweep's value is the **Claude-Code-specific surface**, not the detection engine.
+For deeper detection, run `gitleaks` or `trufflehog` alongside agentsweep — their rule packs are more exhaustive. agentsweep's value is the **agent-history-specific surface**, not the detection engine.
 
 ## License
 

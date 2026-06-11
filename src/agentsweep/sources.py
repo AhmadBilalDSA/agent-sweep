@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Iterator
 
+from .preflight import CLAUDE_CODE_MARKERS, CODEX_MARKERS
 
 KeyPath = list  # list of str (dict keys) or int (list indices)
 
@@ -12,12 +13,17 @@ KeyPath = list  # list of str (dict keys) or int (list indices)
 class Source(ABC):
     """Adapter for a specific AI coding agent's on-disk history format.
 
-    To add a new source (Codex, Aider, etc.), subclass and implement the three
-    abstract methods. See CONTRIBUTING.md for the PR template.
+    To add a new source (Aider, Cursor, ...), subclass and implement the
+    three abstract methods — or subclass JsonlSource if the agent stores
+    plain JSONL. See CONTRIBUTING.md for the PR template.
     """
 
     name: str
+    display_name: str
     root: Path
+    # Substrings that identify the agent in a process listing; used by the
+    # active-session safety gate before --fix.
+    process_markers: tuple[str, ...] = ()
 
     @abstractmethod
     def files(self) -> list[Path]:
@@ -47,13 +53,17 @@ class Source(ABC):
         """
 
 
-class ClaudeCodeSource(Source):
-    """Claude Code CLI — stores per-session JSONL under ~/.claude/projects/."""
-
-    name = "claude-code"
+class JsonlSource(Source):
+    """Shared implementation for agents that store history as JSONL files:
+    every string value inside each line's parsed JSON is scanned, and
+    redaction replaces values in the parsed structure before re-serializing."""
 
     def __init__(self, root: Path | None = None):
-        self.root = root or (Path.home() / ".claude" / "projects")
+        self.root = root or self.default_root()
+
+    @classmethod
+    def default_root(cls) -> Path:
+        raise NotImplementedError
 
     def files(self) -> list[Path]:
         if not self.root.exists():
@@ -105,6 +115,36 @@ class ClaudeCodeSource(Source):
         return "".join(out)
 
 
+class ClaudeCodeSource(JsonlSource):
+    """Claude Code CLI — per-session JSONL under ~/.claude/projects/."""
+
+    name = "claude-code"
+    display_name = "Claude Code"
+    process_markers = CLAUDE_CODE_MARKERS
+
+    @classmethod
+    def default_root(cls) -> Path:
+        return Path.home() / ".claude" / "projects"
+
+
+class CodexSource(JsonlSource):
+    """OpenAI Codex CLI — rollout JSONL under ~/.codex/sessions/YYYY/MM/DD/,
+    plus history.jsonl and session_index.jsonl at the root.
+
+    Rooted at ~/.codex: rglob('*.jsonl') picks up every transcript while
+    structurally excluding auth.json (OAuth tokens, .json) and config.toml —
+    files a redactor must never rewrite.
+    """
+
+    name = "codex"
+    display_name = "Codex"
+    process_markers = CODEX_MARKERS
+
+    @classmethod
+    def default_root(cls) -> Path:
+        return Path.home() / ".codex"
+
+
 def _walk_json(obj, path: KeyPath, line_num: int) -> Iterator[tuple[int, KeyPath, str]]:
     if isinstance(obj, dict):
         for k, v in obj.items():
@@ -137,4 +177,5 @@ def _line_ending(line: str) -> str:
 
 SOURCES: dict[str, type[Source]] = {
     "claude-code": ClaudeCodeSource,
+    "codex": CodexSource,
 }

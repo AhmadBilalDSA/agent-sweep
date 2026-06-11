@@ -16,25 +16,38 @@ CLAUDE_CODE_MARKERS: tuple[str, ...] = (
     " claude ",
 )
 
+CODEX_MARKERS: tuple[str, ...] = (
+    "openai/codex",
+    "/codex ",
+    "codex.exe",
+    "codex.cmd",
+    " codex ",
+)
 
-def is_claude_code_running() -> tuple[bool, str]:
-    """Best-effort detection of a running Claude Code process.
+
+def is_agent_running(markers: tuple[str, ...]) -> tuple[bool, str]:
+    """Best-effort detection of a running agent process by marker substrings.
 
     Returns (is_running, matched_marker). If the check itself fails — ps/tasklist
     unavailable, permission denied, etc. — returns (False, "") and the caller
     falls back to the redactor's mtime defense.
 
-    False positives are preferred to false negatives: "claude" is a short, common
-    string and we'd rather warn once than silently corrupt a session.
+    False positives are preferred to false negatives: these are short, common
+    strings and we'd rather warn once than silently corrupt a session.
     """
     cmdlines = _list_process_cmdlines()
     if cmdlines is None:
         return (False, "")
     blob = "\n".join(cmdlines).lower()
-    for marker in CLAUDE_CODE_MARKERS:
+    for marker in markers:
         if marker in blob:
             return (True, marker.strip())
     return (False, "")
+
+
+def is_claude_code_running() -> tuple[bool, str]:
+    """Back-compat wrapper around is_agent_running for Claude Code."""
+    return is_agent_running(CLAUDE_CODE_MARKERS)
 
 
 def _list_process_cmdlines() -> list[str] | None:
