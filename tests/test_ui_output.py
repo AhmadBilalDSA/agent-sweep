@@ -493,6 +493,34 @@ def test_scan_progress_is_silent_off_terminal(capsys):
     assert captured.err == ""
 
 
+def test_custom_folder_scan_wires_progress(tmp_path, monkeypatch, capsys):
+    """Menu option [3] (--root path) must advance the progress bar once per
+    file so large folders show per-file progress instead of hanging silently."""
+    root = tmp_path / "history"
+    root.mkdir()
+    (root / "a.jsonl").write_text('{"message":"hello"}\n', encoding="utf-8")
+    (root / "b.jsonl").write_text('{"message":"world"}\n', encoding="utf-8")
+
+    advanced: list[str] = []
+
+    class _TrackingProgress:
+        def __enter__(self):
+            return self
+        def __exit__(self, *exc):
+            return False
+        def advance(self, current: str) -> None:
+            advanced.append(current)
+        def detection(self, *a) -> None:
+            pass
+
+    monkeypatch.setattr(ui, "scan_progress", lambda n: _TrackingProgress())
+
+    code = main(["scan", "--root", str(root)])
+    assert code == 0
+    # One advance() call per file, regardless of the source used.
+    assert len(advanced) == 2
+
+
 def test_safe_escapes_unencodable_path_chars():
     c = _console_with_encoding("cp1252")
     # ✓ (U+2713) cannot encode to cp1252; printing it raw would crash.
