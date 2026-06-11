@@ -32,6 +32,14 @@ class Source(ABC):
     def files(self) -> list[Path]:
         """Return every history file to scan under this source's root."""
 
+    def iter_files(self) -> Iterator[Path]:
+        """Yield history files one by one (default: iterate over files()).
+
+        Override in subclasses where streaming discovery is possible so that
+        callers can show a live counter without waiting for the full list.
+        """
+        yield from self.files()
+
     @abstractmethod
     def iter_strings(self, path: Path) -> Iterator[tuple[int, KeyPath, str]]:
         """Yield (line_number, keypath, value) for every string in the file.
@@ -72,6 +80,14 @@ class JsonlSource(Source):
         if not self.root.exists():
             return []
         return sorted(p for p in self.root.rglob("*.jsonl") if p.is_file())
+
+    def iter_files(self) -> Iterator[Path]:
+        """Yield JSONL files as rglob discovers them (no full-list sort)."""
+        if not self.root.exists():
+            return
+        for p in self.root.rglob("*.jsonl"):
+            if p.is_file():
+                yield p
 
     def iter_strings(self, path: Path) -> Iterator[tuple[int, KeyPath, str]]:
         try:
@@ -265,6 +281,20 @@ class OpenCodeSource(Source):
         if not storage.exists():
             return []
         return sorted(p for p in storage.rglob("*.json") if p.is_file())
+
+    def iter_files(self) -> Iterator[Path]:
+        """Yield files as discovered (SQLite DB or legacy JSON files)."""
+        if not self.root.exists():
+            return
+        if self._has_sqlite():
+            yield self._db_path()
+            return
+        storage = self._storage_dir()
+        if not storage.exists():
+            return
+        for p in storage.rglob("*.json"):
+            if p.is_file():
+                yield p
 
     def iter_strings(self, path: Path) -> Iterator[tuple[int, KeyPath, str]]:
         if path == self._db_path():

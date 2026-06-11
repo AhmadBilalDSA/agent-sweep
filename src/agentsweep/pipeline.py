@@ -56,12 +56,16 @@ def run(args) -> int:
         ui.banner(__version__)
 
     if not args.json:
-        with ui.console.status(
-            f"[dim]Discovering files in [bold]{source.root}[/bold]…[/dim]"
-        ):
-            files = source.files()
+        files: list[Path] = []
+        with ui.console.status("") as status:
+            for f in source.iter_files():
+                files.append(f)
+                status.update(
+                    f"[dim]Discovering[/] [bold]{source.root}[/bold]"
+                    f" … [yellow]{len(files):,}[/] file(s)"
+                )
     else:
-        files = source.files()
+        files = list(source.iter_files())
     if not files:
         print(f"No history files found under {source.root}", file=sys.stderr)
         if args.json:
