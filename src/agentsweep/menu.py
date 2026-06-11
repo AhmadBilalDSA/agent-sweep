@@ -77,16 +77,30 @@ def run_menu() -> int:
         elif choice == "3":
             main(["scan", "--source", "opencode"])
         elif choice == "4":
+            main(["scan", "--source", "cursor"])
+        elif choice == "5":
+            main(["scan", "--source", "windsurf"])
+        elif choice == "6":
+            main(["scan", "--source", "aider"])
+        elif choice == "7":
+            main(["scan", "--source", "cline"])
+        elif choice == "8":
+            main(["scan", "--source", "gemini-cli"])
+        elif choice == "9":
+            main(["scan", "--source", "continue-vscode"])
+        elif choice == "10":
+            main(["scan", "--source", "github-copilot-chat"])
+        elif choice == "11":
             root = _ask_folder()
             if root is not None:
                 main(["scan", "--root", str(root)])
-        elif choice == "5":
+        elif choice == "12":
             main(["fix", "--source", "claude-code"])
-        elif choice == "6":
+        elif choice == "13":
             main(["undo", "--source", "claude-code"])
-        elif choice == "7":
+        elif choice == "14":
             main(["scan", "--source", "claude-code", "--json"])
-        elif choice == "8":
+        elif choice == "15":
             from .cli import check_for_update, _version_tuple
             print("  checking for updates…")
             latest, err = check_for_update(timeout=5)
@@ -99,10 +113,10 @@ def run_menu() -> int:
                 )
             else:
                 print(f"  agentsweep {__version__} is up to date")
-        elif choice in {"9", "q", "quit", "exit"}:
+        elif choice in {"16", "q", "quit", "exit"}:
             return 0
         else:
-            ui.warn_line(f"unknown option: {choice!r} — pick 1-9")
+            ui.warn_line(f"unknown option: {choice!r} — pick 1-16")
             continue
 
         try:

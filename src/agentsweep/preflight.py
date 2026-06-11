@@ -32,6 +32,58 @@ OPENCODE_MARKERS: tuple[str, ...] = (
     " opencode ",
 )
 
+CURSOR_MARKERS: tuple[str, ...] = (
+    "cursor.exe",
+    "/cursor ",
+    "cursor.cmd",
+    " cursor ",
+    "anysphere/cursor",
+)
+
+WINDSURF_MARKERS: tuple[str, ...] = (
+    "Windsurf",
+    "windsurf.exe",
+    "/windsurf ",
+    "windsurf.cmd",
+    " windsurf ",
+    "codeium/windsurf",
+)
+
+AIDER_MARKERS: tuple[str, ...] = (
+    "aider",
+    "/aider ",
+    "aider.exe",
+    " aider ",
+)
+
+CLINE_MARKERS: tuple[str, ...] = (
+    "saoudrizwan.claude-dev",
+    "cline",
+    "/cline ",
+)
+
+GEMINI_CLI_MARKERS: tuple[str, ...] = (
+    "gemini",
+    "/gemini ",
+    "gemini.exe",
+    "gemini.cmd",
+    " gemini ",
+    "google/gemini-cli",
+)
+
+CONTINUE_MARKERS: tuple[str, ...] = (
+    "continuedev",
+    "continue-dev",
+    "/continue ",
+    "continue.exe",
+)
+
+GITHUB_COPILOT_MARKERS: tuple[str, ...] = (
+    "GitHub.copilot-chat",
+    "copilot-chat",
+    "copilot.chat",
+)
+
 
 def is_agent_running(markers: tuple[str, ...]) -> tuple[bool, str]:
     """Best-effort detection of a running agent process by marker substrings.

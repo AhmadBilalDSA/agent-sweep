@@ -1,36 +1,41 @@
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-build/
-dist/
-*.egg-info/
-*.egg
+*.pyo
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Environments
 .venv/
 venv/
 env/
-.coverage
-htmlcov/
-*.bak
+.uv/
+
+# Claude Code / AI instructions (per-developer, not committed)
+.claude/
+CLAUDE.md
+
+# IDE
 .idea/
 .vscode/
-*.swp
+*.code-workspace
+
+# agentsweep runtime
+*.bak
+agentsweep-audit.jsonl
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+
+# OS
 .DS_Store
 Thumbs.db
-
-# agentsweep's own default output files (anti-flood / -o defaults)
-agentsweep-report.txt
-agentsweep-findings.json
-*.stackdump
-
-# Scratch/debug scripts (often contain unsplit fake secrets that trip
-# push protection) — keep them out of the repo entirely.
-# Note: _[a-z]*.py (not _*.py) so dunder files like __init__.py are NOT
-# matched — that glob silently dropped packages from the built wheel.
-debug_*.py
-verify_*.py
-_[a-z]*.py
+desktop.ini
