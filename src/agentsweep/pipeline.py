@@ -69,26 +69,15 @@ def run(args) -> int:
                else ignore_mod.load([source.root, Path.cwd()]))
 
     if args.json:
-        found_by_file, _, suppressed = _scan_all(source, files, ignores=ignores)
+        found_by_file, _, suppressed = _scan(source, files, ignores)
         return _output_json(found_by_file, source, output, suppressed)
 
     ui.stage(1, "ok", "DISCOVER", source.name, f"{len(files)} file(s)", source.root)
 
     t0 = time.perf_counter()
     with ui.scan_progress(len(files)) as progress:
-        # detection() is provided by the live-feed progress renderer; guard
-        # it so the pipeline stays decoupled from the exact progress API.
-        _detect = getattr(progress, "detection", None)
-
-        def _on_finding(f: Finding) -> None:
-            if _detect is not None:
-                _detect(f.display, f.masked,
-                        f"{ui.rel(f.file, source.root)}:{f.line}")
-        found_by_file, strings_scanned, suppressed = _scan_all(
-            source, files, ignores=ignores,
-            on_file=lambda f: progress.advance(ui.rel(f, source.root)),
-            on_finding=_on_finding,
-        )
+        found_by_file, strings_scanned, suppressed = _scan(
+            source, files, ignores, progress)
     elapsed = time.perf_counter() - t0
 
     ui.stage(2, "ok", "SCAN", f"{len(files)} file(s)",
@@ -158,6 +147,25 @@ def _suggest_paths(missing: Path) -> list[str]:
     except OSError:
         return []
     return difflib.get_close_matches(missing.name, siblings, n=3, cutoff=0.5)
+
+
+def _scan(source, files, ignores, progress=None):
+    """Scan all files, wiring the progress bar + live detection feed when a
+    progress object is supplied. (A multiprocessing path was evaluated and
+    dropped — on Windows the spawn + per-worker regex recompile cost gave
+    ~1.1x and risked a re-import fork bomb; see docs/PERF.md.)"""
+    def _on_file(f: Path) -> None:
+        if progress is not None:
+            progress.advance(ui.rel(f, source.root))
+
+    det = getattr(progress, "detection", None) if progress is not None else None
+
+    def _on_finding(fd: Finding) -> None:
+        if det is not None:
+            det(fd.display, fd.masked, f"{ui.rel(fd.file, source.root)}:{fd.line}")
+
+    return _scan_all(source, files, ignores=ignores,
+                     on_file=_on_file, on_finding=_on_finding)
 
 
 def _scan_all(

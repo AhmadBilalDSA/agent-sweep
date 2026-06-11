@@ -57,6 +57,14 @@ def _valid(words: list[str]) -> bool:
 
 def detect_mnemonics(text: str):
     """Yield scanner.Finding objects for validated seed phrases in `text`."""
+    # Cheap reject before tokenizing: a 12-word phrase needs at least 11
+    # word separators. A big tokenless blob (base64, minified JS, a long
+    # path) has far fewer, so skip it without the per-token regex scan.
+    # Lossless: any string holding 12 separated words has >= 11 separators.
+    if (text.count(" ") + text.count("\n")
+            + text.count(",") + text.count(";")) < 11:
+        return []
+
     from .scanner import Finding  # late import: scanner imports this module
 
     # Group word tokens into runs where every word is on the wordlist and
