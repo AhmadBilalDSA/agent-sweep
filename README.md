@@ -1,15 +1,32 @@
-# AgentSweep
+<div align="center">
 
 ![AgentSweep](docs/logo.png)
 
-> Find and redact secrets (API keys, tokens, private keys, DB URLs) that got pasted into your AI coding agent's local history. **Runs fully offline — your files never leave your machine.**
+# AgentSweep
 
+**Find and redact secrets in your AI coding agent's local history. Fully offline.**
+
+[![PyPI version](https://img.shields.io/pypi/v/agentsweep?color=blue&label=pypi)](https://pypi.org/project/agentsweep/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/agentsweep)](https://pypi.org/project/agentsweep/)
+[![CI](https://github.com/Ishannaik/agent-sweep/actions/workflows/ci.yml/badge.svg)](https://github.com/Ishannaik/agent-sweep/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/Ishannaik/agent-sweep)
-[![Offline](https://img.shields.io/badge/runs-fully%20offline-brightgreen.svg)](https://github.com/Ishannaik/agent-sweep)
+[![Offline](https://img.shields.io/badge/runs-fully%20offline-brightgreen.svg)](#)
+[![Stars](https://img.shields.io/github/stars/Ishannaik/agent-sweep?style=social)](https://github.com/Ishannaik/agent-sweep/stargazers)
+[![Visitors](https://visitor-badge.laobi.icu/badge?page_id=Ishannaik.agent-sweep)](https://github.com/Ishannaik/agent-sweep)
 
-**Status:** alpha. Works on **Claude Code** and **OpenAI Codex** today. Aider, Cursor, Continue via contributed `Source` adapters — see [CONTRIBUTING.md](CONTRIBUTING.md).
+> API keys, tokens, DB URLs, crypto seed phrases — anything you pasted into an AI coding agent is sitting in plain text on disk.
+> **agentsweep finds them and redacts them in place. Your files never leave your machine.**
+
+---
+
+**10 agents supported:** Claude Code · Codex · OpenCode · Cursor · Windsurf · Aider · Cline · Gemini CLI · Continue · GitHub Copilot Chat
+
+**189 detection rules** — AWS, GitHub, Stripe, OpenAI, Anthropic, Google, Slack, HuggingFace, JWT, PEM keys, DB URLs, BIP-39 seed phrases, and [many more](#whats-detected)
+
+**Alpha** — every destructive step is gated, backed up, and reversible with one command
+
+</div>
 
 ## The problem
 
@@ -32,31 +49,36 @@ AI coding assistants have created a new category of credential exposure that did
 
 **AI agent history is the new `.bash_history` — except it contains full context, not just commands.** The attack tooling already knows this. `agentsweep` exists to clean up before it's exploited.
 
-## Install
-
-**Recommended — isolated, no venv conflicts, always works:**
+## Quick start
 
 ```bash
-uv tool install agentsweep      # one-time install; adds `agentsweep` + `asweep` to PATH
+pip install uv                  # get uv (skip if you already have it)
+uv tool install agentsweep      # install — adds `agentsweep` and `asweep` to PATH
+asweep                          # run — interactive menu guides you through everything
+```
+
+That's it. No virtualenv to activate, no PATH fiddling — `uv tool install` gives the command its own isolated environment.
+
+## Install
+
+**Recommended — isolated, no venv conflicts:**
+```bash
+uv tool install agentsweep      # one-time install
 uv tool upgrade agentsweep      # update to latest
 ```
 
-**Run without installing (always latest, no cache issues):**
-
+**Try without installing (always runs latest):**
 ```bash
 uvx agentsweep@latest
-uvx asweep@latest
 ```
 
 **Classic pip:**
-
 ```bash
 pip install agentsweep
+pip install --upgrade agentsweep
 ```
 
-> `uv` is a fast Python package manager — install it with `pip install uv` or from [astral.sh/uv](https://docs.astral.sh/uv/). `uv tool install` puts the command in its own isolated environment so it never conflicts with project venvs.
-
-Requires Python 3.11+.
+> Don't have `uv`? `pip install uv` or see [astral.sh/uv](https://docs.astral.sh/uv/). Requires Python 3.11+.
 
 ## Usage
 
@@ -74,31 +96,80 @@ agentsweep
 Scripting is unaffected: any flag, or a piped/redirected stream, skips the
 menu entirely and behaves exactly as documented below.
 
-### Flags
+### Verbs
 
-Scan (read-only, safe):
+| Command | What it does |
+|---|---|
+| `agentsweep scan` | Scan only — read-only, no files are modified (default when no verb given) |
+| `agentsweep fix` | Scan, then offer to redact findings in place (type `REDACT` to confirm) |
+| `agentsweep undo` | Restore all `.bak` backups, reverting any previous redaction |
+| `agentsweep --version` / `-V` | Print the installed version |
+| `agentsweep --update` | Check PyPI for a newer release |
 
+The legacy flag form `agentsweep --fix` is still accepted and behaves identically to `agentsweep fix`.
+
+### Source selection
+
+Pick which agent's history to target with `--source`. The default is `claude-code`.
+
+```bash
+agentsweep scan --source claude-code       # ~/.claude/projects/ (default)
+agentsweep scan --source codex             # ~/.codex/sessions/
+agentsweep scan --source opencode          # OpenCode SQLite store
+agentsweep scan --source cursor            # Cursor history
+agentsweep scan --source windsurf          # Windsurf history
+agentsweep scan --source aider             # ~/.aider/
+agentsweep scan --source cline             # Cline history
+agentsweep scan --source gemini-cli        # Gemini CLI history
+agentsweep scan --source continue-vscode   # Continue (VS Code) history
+agentsweep scan --source github-copilot-chat  # GitHub Copilot Chat history
 ```
-agentsweep --source claude-code
-agentsweep --source codex
+
+Override the default root directory to scan any arbitrary folder:
+
+```bash
+agentsweep scan --root ~/backups/claude-history
+agentsweep fix  --root /tmp/history-copy --allow-production
 ```
 
-Redact in place (creates `.bak` backups):
+### Scan / fix flags
 
-```
-agentsweep --fix --allow-production
+```bash
+# Machine-readable JSON to stdout (exit 0 = clean, 1 = findings found, 2 = error)
+agentsweep scan --json
+
+# Write findings JSON to a file instead of stdout
+agentsweep scan --json -o findings.json
+agentsweep scan --json --output /tmp/report.json
+
+# Skip .agentsweepignore files
+agentsweep scan --no-ignore
 ```
 
-Point at an arbitrary folder (e.g. a copy of your history):
+### Fix-only flags
 
-```
-agentsweep --root /path/to/jsonl-files --fix
+```bash
+# Redact Claude Code history in place (--allow-production required for default roots during alpha)
+agentsweep fix --allow-production
+
+# Skip creating .bak backups (not recommended)
+agentsweep fix --allow-production --no-backup
+
+# Bypass soft safety checks: mtime gate (files modified <60 s ago) and running-process gate
+agentsweep fix --allow-production --force
+
+# Combine: non-interactive JSON-mode redaction against a custom root
+agentsweep fix --root ~/history-copy --json
 ```
 
-Machine-readable output:
+### Undo flags
 
-```
-agentsweep --json
+```bash
+# Undo redactions for a specific source
+agentsweep undo --source codex
+
+# Undo against a custom root
+agentsweep undo --root ~/history-copy
 ```
 
 ## Corruption-prevention guarantees
@@ -118,9 +189,17 @@ A redactor that corrupts your history is strictly worse than the leak it's fixin
 
 ## Recovery
 
-Every redacted file has a sibling `*.bak` with the original bytes. To undo:
+Every redacted file has a sibling `*.bak` with the original bytes. The easiest way to undo all redactions for a source is:
 
+```bash
+agentsweep undo                        # undo Claude Code (default)
+agentsweep undo --source codex         # undo a specific source
+agentsweep undo --root ~/history-copy  # undo against a custom root
 ```
+
+If you need to restore a single file manually (e.g. you deleted the undo command's source):
+
+```bash
 mv session.jsonl.bak session.jsonl
 ```
 
