@@ -61,7 +61,7 @@ def _read_key_unix() -> str:
             # Drain the rest of the sequence. Arrows are ESC [ A/B (CSI) or
             # ESC O A/B (SS3, sent in application-cursor-key mode, e.g. some
             # GNOME/xterm configs).
-            rest = os.read(fd, 16)
+            rest = os.read(fd, 6)
             if rest in (b"[A", b"OA"):
                 return UP
             if rest in (b"[B", b"OB"):
