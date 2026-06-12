@@ -7,7 +7,7 @@
 **Find and redact secrets in your AI coding agent's local history. Fully offline.**
 
 [![PyPI version](https://img.shields.io/pypi/v/agentsweep)](https://pypi.org/project/agentsweep/)
-[![PyPI downloads](https://static.pepy.tech/badge/agentsweep)](https://pepy.tech/project/agentsweep)
+[![PyPI downloads](https://img.shields.io/pypi/dm/agentsweep)](https://pypi.org/project/agentsweep/)
 [![CI](https://github.com/Ishannaik/agent-sweep/actions/workflows/ci.yml/badge.svg)](https://github.com/Ishannaik/agent-sweep/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
