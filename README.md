@@ -6,13 +6,13 @@
 
 **Find and redact secrets in your AI coding agent's local history. Fully offline.**
 
-[![PyPI version](https://img.shields.io/pypi/v/agentsweep?color=blue&label=pypi)](https://pypi.org/project/agentsweep/)
-[![PyPI downloads](https://img.shields.io/pypi/dm/agentsweep)](https://pypi.org/project/agentsweep/)
+[![PyPI version](https://img.shields.io/pypi/v/agentsweep)](https://pypi.org/project/agentsweep/)
+[![PyPI downloads](https://static.pepy.tech/badge/agentsweep)](https://pepy.tech/project/agentsweep)
 [![CI](https://github.com/Ishannaik/agent-sweep/actions/workflows/ci.yml/badge.svg)](https://github.com/Ishannaik/agent-sweep/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Offline](https://img.shields.io/badge/runs-fully%20offline-brightgreen.svg)](#)
-[![Stars](https://img.shields.io/github/stars/Ishannaik/agent-sweep?style=social)](https://github.com/Ishannaik/agent-sweep/stargazers)
+[![GitHub Stars](https://img.shields.io/github/stars/Ishannaik/agent-sweep)](https://github.com/Ishannaik/agent-sweep/stargazers)
 [![Visitors](https://visitor-badge.laobi.icu/badge?page_id=Ishannaik.agent-sweep)](https://github.com/Ishannaik/agent-sweep)
 
 > **Prevention:** Don't paste API keys into cloud-backed AI agents at all — the key transits the provider's servers before it ever hits your disk.
