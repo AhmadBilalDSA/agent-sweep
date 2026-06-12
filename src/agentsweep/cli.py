@@ -160,10 +160,12 @@ def main(argv: list[str] | None = None) -> int:
 
         # Interactive scan OR interactive fix: scan first, then offer to
         # redact what we found. One guided path; the offer is the fix.
+        findings_out: list = []
         args.fix = False
-        code = run(args)
+        code = run(args, _findings_out=findings_out)
         if code == 1 and not args.json and _interactive():
-            fixed = offer_redaction(args)
+            src, fbf = findings_out[0] if findings_out else (None, None)
+            fixed = offer_redaction(args, source=src, found_by_file=fbf)
             if fixed is not None:
                 return fixed
         return code

@@ -292,6 +292,13 @@ def test_menu_renders_and_quits(monkeypatch, _isolated_home, capsys):
 
 
 def test_menu_scan_action_then_quit(monkeypatch, _isolated_home, capsys):
+    # Patch _scan_all_sources to avoid traversing real system directories
+    # (e.g. APPDATA/Cursor, APPDATA/Windsurf) that are not isolated by tmp_path.
+    import sys as _sys
+    from agentsweep import menu as _menu
+    def _fast_scan_all():
+        print("No history files found for any source.", file=_sys.stderr)
+    monkeypatch.setattr(_menu, "_scan_all_sources", _fast_scan_all)
     _feed_menu(monkeypatch, ["1", "", "q"])
     assert main([]) == 0
     captured = capsys.readouterr()
@@ -304,9 +311,9 @@ def test_menu_folder_typo_then_retry_shows_count(
     good.mkdir()
     (good / "s.jsonl").write_text(FIXTURE_LINE, encoding="utf-8")
 
-    # 11 → typo (suggestion shown) → corrected path (count shown, scan runs)
+    # 2 → typo (suggestion shown) → corrected path (count shown, scan runs)
     # → Enter skips the post-scan redaction offer → Enter → q quit.
-    _feed_menu(monkeypatch, ["11", str(tmp_path / "histori"), str(good), "", "",
+    _feed_menu(monkeypatch, ["2", str(tmp_path / "histori"), str(good), "", "",
                              "q"])
     assert main([]) == 0
     captured = capsys.readouterr()
@@ -322,7 +329,7 @@ def test_menu_empty_folder_offers_scan_anyway(
     empty = tmp_path / "empty"
     empty.mkdir()
     # decline the scan-anyway offer twice more → _ask_folder gives up → menu → quit
-    _feed_menu(monkeypatch, ["11", str(empty), "n", str(empty), "n", str(empty),
+    _feed_menu(monkeypatch, ["2", str(empty), "n", str(empty), "n", str(empty),
                              "n", "", "q"])
     assert main([]) == 0
     out = capsys.readouterr().out
@@ -344,7 +351,7 @@ def test_menu_redact_requires_typed_confirmation(
     session.write_text(FIXTURE_LINE, encoding="utf-8")
 
     # "redact" (lowercase) is NOT the magic word — nothing must be written.
-    _feed_menu(monkeypatch, ["12", "redact", "", "q"])
+    _feed_menu(monkeypatch, ["3", "redact", "", "q"])
     assert main([]) == 0
     assert AWS_KEY in session.read_text(encoding="utf-8")
     assert not session.with_name("session.jsonl.bak").exists()
@@ -358,9 +365,9 @@ def test_menu_redact_confirmed_writes_and_undo_restores(
     session.write_text(FIXTURE_LINE, encoding="utf-8")
     original = session.read_text(encoding="utf-8")
 
-    # 12 → REDACT → (mtime gate refuses fresh file → exit 2) → y forces →
-    # Enter → 13 undo → y → Enter → q quit.
-    _feed_menu(monkeypatch, ["12", "REDACT", "y", "", "13", "y", "", "q"])
+    # 3 → REDACT → (mtime gate refuses fresh file → exit 2) → y forces →
+    # Enter → 4 undo → y → Enter → q quit.
+    _feed_menu(monkeypatch, ["3", "REDACT", "y", "", "4", "y", "", "q"])
     assert main([]) == 0
 
     restored = session.read_text(encoding="utf-8")

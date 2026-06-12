@@ -37,9 +37,13 @@ def _opt(args, name: str, default=None):
     return getattr(args, name, default)
 
 
-def run(args) -> int:
+def run(args, *, _findings_out: list | None = None) -> int:
     """Execute one scan (and optional redact) run. Exit codes:
     0 clean · 1 findings (scan-only) · 2 gate-blocked, write error, or bad path.
+
+    When _findings_out is provided and args.fix is False, appends
+    (source, found_by_file) to it so the caller can pass pre-computed
+    findings to offer_redaction(), avoiding a double-scan on REDACT.
     """
     source_cls = SOURCES[args.source]
     source: Source = source_cls(root=args.root) if args.root else source_cls()
@@ -112,6 +116,8 @@ def run(args) -> int:
                  "skipped — run with --fix to redact in place (.bak backups)")
         ui.stage(5, "warn", "ROTATE", "these keys are still live")
         ui.rotation_panel(_rotation_items(found_by_file))
+        if _findings_out is not None:
+            _findings_out.append((source, found_by_file))
         return 1
 
     gate_err = _preflight_gates(source, source_cls, args)
@@ -145,6 +151,44 @@ def run(args) -> int:
         ui.stage(5, "warn", "ROTATE", "nothing redacted", "these keys are still live")
     ui.rotation_panel(_rotation_items(found_by_file))
 
+    return 0 if errors == 0 else 2
+
+
+def redact_findings(args, source: Source, found_by_file: dict) -> int:
+    """Apply REDACT + ROTATE using pre-computed findings; skip DISCOVER + SCAN.
+
+    Called from offer_redaction() when the first scan cached its results via
+    _findings_out, so the user never sees the pipeline restart from scratch.
+    Exit codes: 0 clean, 2 gate-blocked or write error.
+    """
+    source_cls = SOURCES[args.source]
+    gate_err = _preflight_gates(source, source_cls, args)
+    if gate_err is not None:
+        ui.stage(5, "warn", "ROTATE", "these keys are still live")
+        ui.rotation_panel(_rotation_items(found_by_file))
+        return gate_err
+
+    rows, errors = _redact_all(
+        source=source,
+        found_by_file=found_by_file,
+        backup=not args.no_backup,
+        force=args.force,
+    )
+    ok_count = sum(1 for status, _, _ in rows if status == "ok")
+    if errors == 0:
+        ui.stage(4, "ok", "REDACT", f"{ok_count}/{len(rows)} file(s) rewritten")
+    elif ok_count:
+        ui.stage(4, "warn", "REDACT", f"{ok_count}/{len(rows)} file(s) rewritten")
+    else:
+        ui.stage(4, "fail", "REDACT", f"0/{len(rows)} file(s) rewritten")
+    for status, path_display, note in rows:
+        ui.redact_row(status, path_display, note)
+
+    if ok_count:
+        ui.stage(5, "warn", "ROTATE", "redacted locally", "keys live until rotated")
+    else:
+        ui.stage(5, "warn", "ROTATE", "nothing redacted", "these keys are still live")
+    ui.rotation_panel(_rotation_items(found_by_file))
     return 0 if errors == 0 else 2
 
 

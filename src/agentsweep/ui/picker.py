@@ -44,10 +44,10 @@ def _render_rows(
         is_btn = is_button and i in is_button
 
         if focused and is_btn:
-            lbl_style = "bold black on red"
+            lbl_style = "bold white on red"
             pfx = ""
         elif focused:
-            lbl_style = "bold black on red"
+            lbl_style = "bold white on red"
             pfx = ""
         else:
             lbl_style = "white"
@@ -75,7 +75,7 @@ def _run_menu(
     *,
     multi: bool = False,
     button_idx: int | None = None,
-    footer: str = "↑/↓ move · Enter select · q quit",
+    footer: str = "↑↓ move  Enter select  q quit",
 ) -> int | tuple[set[int], bool] | None:
     """Generic picker loop.
 
@@ -98,7 +98,7 @@ def _run_menu(
             is_btn = (i == button_idx)
 
             if focused:
-                row_style = "bold black on red"
+                row_style = "bold white on red"
             elif is_btn:
                 row_style = "bold red"
             else:
@@ -108,7 +108,7 @@ def _run_menu(
                 ch = _check(i in checked, console)
                 pfx = Text(f"[{ch}]", style="bold red" if i in checked else "dim")
             elif is_btn:
-                pfx = Text("►", style="bold red" if not focused else "bold black on red")
+                pfx = Text("►", style="bold red" if not focused else "bold white on red")
             else:
                 pfx = Text("", style="")
 
@@ -181,7 +181,7 @@ def action_menu() -> str | None:
         "AGENTSWEEP",
         _ACTION_ROWS,
         multi=False,
-        footer="↑/↓ move · Enter select · q quit",
+        footer="↑↓ move  Enter select  q quit",
     )
     if result is None:
         return None
@@ -221,7 +221,7 @@ def source_picker() -> list[str] | None:
         rows,
         multi=True,
         button_idx=button_idx,
-        footer="↑/↓ move · Space toggle · Enter on Run Scan · q back",
+        footer="↑↓ move  Space toggle  Enter=run  q back",
     )
     if result is None:
         return None
