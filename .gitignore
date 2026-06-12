@@ -19,6 +19,7 @@ env/
 # Claude Code / AI instructions (per-developer, not committed)
 .claude/
 CLAUDE.md
+launch-posts.md
 
 # IDE
 .idea/
