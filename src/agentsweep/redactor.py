@@ -16,7 +16,7 @@ MIN_AGE_SECONDS = 60
 def audit_path() -> Path:
     # Resolved at call time, not import time, so tests that monkeypatch
     # HOME/USERPROFILE never append to the user's real audit log.
-    return Path.home() / ".claude" / "agentsweep-audit.jsonl"
+    return Path.home() / ".agentsweep" / "audit.jsonl"
 
 
 class SafetyError(Exception):
@@ -90,7 +90,7 @@ def safe_write(path: Path, new_content: str | bytes,
         or the complete new file on disk — never a torn write.
       - Backup: writes `<path>.bak` before replacement (refuses if one
         already exists, to avoid clobbering a prior backup).
-      - Audit: appends a record to ~/.claude/agentsweep-audit.jsonl with
+      - Audit: appends a record to ~/.agentsweep/audit.jsonl with
         SHA256 of both versions.
     """
     original_bytes = path.read_bytes()

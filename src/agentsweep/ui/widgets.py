@@ -42,7 +42,7 @@ def menu_options() -> None:
     grid.add_column(style="bold red", justify="right")
     grid.add_column()
     grid.add_column(style="dim")
-    grid.add_row("[1]", "Scan all sources", "all 10 agents in parallel")
+    grid.add_row("[1]", "Scan all sources", "all 13 agents in parallel")
     grid.add_row("[2]", "Scan custom folder", "point at any directory")
     grid.add_row("[3]", "Redact secrets", "run agentsweep fix (with typed REDACT confirmation)")
     grid.add_row("[4]", "Undo last redaction", "restores .bak backups")

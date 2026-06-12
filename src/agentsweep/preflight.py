@@ -84,6 +84,31 @@ GITHUB_COPILOT_MARKERS: tuple[str, ...] = (
     "copilot.chat",
 )
 
+OPENCLAW_MARKERS: tuple[str, ...] = (
+    "openclaw",
+    "/openclaw ",
+    "openclaw.cmd",
+    " openclaw ",
+    "openclaw/openclaw",
+)
+
+HERMES_MARKERS: tuple[str, ...] = (
+    "hermes-agent",
+    "/hermes ",
+    "hermes.exe",
+    "hermes.cmd",
+    " hermes ",
+    "NousResearch/hermes",
+)
+
+GOOSE_MARKERS: tuple[str, ...] = (
+    "block/goose",
+    "/goose ",
+    "goose.exe",
+    "goose.cmd",
+    " goose ",
+)
+
 
 def is_agent_running(markers: tuple[str, ...]) -> tuple[bool, str]:
     """Best-effort detection of a running agent process by marker substrings.

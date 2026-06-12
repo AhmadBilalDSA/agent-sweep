@@ -36,7 +36,7 @@ FIXTURE_LINE = (
 
 @pytest.fixture(autouse=True)
 def _isolated_home(tmp_path, monkeypatch):
-    """Keep every test away from the real ~/.claude (audit log lives there)."""
+    """Keep every test away from the real home (audit log at ~/.agentsweep/ lives there)."""
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))

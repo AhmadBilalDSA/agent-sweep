@@ -27,7 +27,7 @@ ANSI_ESCAPE = re.compile(r"\x1b\[")
 
 @pytest.fixture(autouse=True)
 def _isolated_home(tmp_path, monkeypatch):
-    """Keep every test away from the real ~/.claude (audit log lives there)."""
+    """Keep every test away from the real home (audit log at ~/.agentsweep/ lives there)."""
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
@@ -238,7 +238,7 @@ def test_fix_writes_audit_log_in_isolated_home(
     code = main(["--root", str(root), "--fix", "--force"])
 
     assert code == 0
-    audit = _isolated_home / ".claude" / "agentsweep-audit.jsonl"
+    audit = _isolated_home / ".agentsweep" / "audit.jsonl"
     assert audit.exists()
     record = json.loads(audit.read_text(encoding="utf-8").splitlines()[0])
     assert record["path"].endswith("session.jsonl")

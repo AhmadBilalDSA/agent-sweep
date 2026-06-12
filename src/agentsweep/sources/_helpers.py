@@ -1,0 +1,230 @@
+"""Format-specific helpers: SQLite copy-and-redact, JSONL, JSON, plaintext."""
+from __future__ import annotations
+
+import json
+import os
+import sqlite3
+import tempfile
+from pathlib import Path
+from typing import Iterator
+
+from ..redactor import SafetyError
+from ._base import KeyPath, _line_ending, _set_by_path, _walk_json
+
+
+# ---------------------------------------------------------------------------
+# SQLite helpers
+# ---------------------------------------------------------------------------
+
+def _redact_sqlite_copy(path: Path, redactions: list, columns_fn) -> bytes:
+    """Apply SQLite redactions to a temp copy of `path` and return its bytes.
+
+    The production database is never touched here — the pipeline writes the
+    returned bytes back through redactor.safe_write, which owns the .bak
+    backup, the atomic replace and the audit record (the same contract as
+    text sources). Steps:
+
+      1. Snapshot `path` into a sibling tempfile via sqlite's backup API
+         (page-consistent, checkpoints any WAL into the copy).
+      2. Run the UPDATEs against the copy with secure_delete on, then
+         VACUUM, so the replaced plaintext cannot survive in freelist or
+         page slack space.
+      3. Gate on PRAGMA integrity_check before returning the copy's bytes.
+
+    `columns_fn(con)` returns the source's whitelisted (table, column)
+    pairs; redactions targeting anything outside that whitelist are skipped.
+    """
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(path.parent), prefix=f".{path.name}.", suffix=".redact")
+    os.close(fd)
+    tmp = Path(tmp_name)
+    try:
+        try:
+            src_con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        except sqlite3.Error as e:
+            raise SafetyError(f"Cannot open {path} read-only: {e}") from e
+        try:
+            dst_con = sqlite3.connect(str(tmp))
+            try:
+                src_con.backup(dst_con)
+                dst_con.execute("PRAGMA secure_delete = ON")
+                allowed = set(columns_fn(dst_con))
+                _apply_sqlite_updates(dst_con, redactions, allowed)
+                dst_con.commit()
+                dst_con.execute("VACUUM")
+                row = dst_con.execute("PRAGMA integrity_check").fetchone()
+                if row is None or row[0] != "ok":
+                    raise SafetyError(
+                        f"Redacted copy of {path.name} failed "
+                        f"integrity_check; refusing to write")
+            finally:
+                dst_con.close()
+        finally:
+            src_con.close()
+        return tmp.read_bytes()
+    except sqlite3.Error as e:
+        raise SafetyError(
+            f"SQLite error while redacting {path.name}: {e}") from e
+    finally:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+
+
+def _apply_sqlite_updates(
+    con: sqlite3.Connection,
+    redactions: list,
+    allowed: set[tuple[str, str]],
+) -> None:
+    """Run redaction UPDATEs on `con`. Keypath encoding per SQLite row:
+    [table, rowid, column] (+ JSON sub-path when the column holds JSON)."""
+    for _line_num, kp, new_val in redactions:
+        if len(kp) < 3:
+            continue
+        table, rowid, col = kp[0], kp[1], kp[2]
+        if (table, col) not in allowed:
+            continue
+        sub_kp = kp[3:]
+        if not sub_kp:
+            con.execute(
+                f"UPDATE {table} SET {col} = ? WHERE rowid = ?",  # noqa: S608
+                (new_val, rowid),
+            )
+        else:
+            cur = con.execute(
+                f"SELECT {col} FROM {table} WHERE rowid = ?",  # noqa: S608
+                (rowid,),
+            )
+            row = cur.fetchone()
+            if row is None:
+                continue
+            try:
+                obj = json.loads(row[0])
+            except (json.JSONDecodeError, TypeError):
+                continue
+            _set_by_path(obj, sub_kp, new_val)
+            con.execute(
+                f"UPDATE {table} SET {col} = ? WHERE rowid = ?",  # noqa: S608
+                (json.dumps(obj, ensure_ascii=False), rowid),
+            )
+
+
+# ---------------------------------------------------------------------------
+# Format helpers (JSONL, whole-file JSON, plaintext)
+# ---------------------------------------------------------------------------
+
+def _iter_jsonl_strings(path: Path) -> Iterator[tuple[int, KeyPath, str]]:
+    """Yield (line_num, keypath, value) for every string in a JSONL file."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return
+    for i, line in enumerate(text.splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        yield from _walk_json(obj, [], i)
+
+
+def _apply_jsonl_redactions(
+    path: Path,
+    redactions: list[tuple[int, KeyPath, str]],
+) -> str:
+    """Apply redactions to a JSONL file, preserving line count and endings."""
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines(keepends=True)
+    by_line: dict[int, list[tuple[KeyPath, str]]] = {}
+    for line_num, kp, new_val in redactions:
+        by_line.setdefault(line_num, []).append((kp, new_val))
+    out: list[str] = []
+    for i, line in enumerate(lines, 1):
+        if i not in by_line or not line.strip():
+            out.append(line)
+            continue
+        ending = _line_ending(line)
+        body = line[: len(line) - len(ending)]
+        try:
+            obj = json.loads(body)
+        except json.JSONDecodeError:
+            out.append(line)
+            continue
+        for kp, new_val in by_line[i]:
+            _set_by_path(obj, kp, new_val)
+        out.append(json.dumps(obj, ensure_ascii=False) + ending)
+    return "".join(out)
+
+
+def _iter_json_file_strings(path: Path) -> Iterator[tuple[int, KeyPath, str]]:
+    """Yield all string values from a whole-file JSON object/array."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return
+    try:
+        obj = json.loads(text)
+    except json.JSONDecodeError:
+        return
+    yield from _walk_json(obj, [], 1)
+
+
+def _apply_json_file_redactions(
+    path: Path,
+    redactions: list[tuple[int, KeyPath, str]],
+) -> bytes:
+    """Apply redactions to a whole-file JSON, returning bytes.
+
+    Returns bytes so safe_write skips JSONL per-line validation (which
+    would reject indent=2 multi-line JSON). Structure is validated here
+    by the json.loads → json.dumps round-trip.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return b""
+    try:
+        obj = json.loads(text)
+    except json.JSONDecodeError:
+        return text.encode("utf-8")
+    for _line_num, kp, new_val in redactions:
+        _set_by_path(obj, kp, new_val)
+    return json.dumps(obj, ensure_ascii=False, indent=2).encode("utf-8")
+
+
+def _iter_plaintext_lines(path: Path) -> Iterator[tuple[int, KeyPath, str]]:
+    """Yield (line_num, [line_num], line_text) for every non-empty line."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return
+    for i, line in enumerate(text.splitlines(), 1):
+        if line.strip():
+            yield (i, [i], line)
+
+
+def _apply_plaintext_redactions(
+    path: Path,
+    redactions: list[tuple[int, KeyPath, str]],
+) -> bytes:
+    """Apply line-level redactions to a plain-text file, returning bytes.
+
+    Returns bytes so safe_write skips JSONL per-line validation (which
+    would reject Markdown and other non-JSON text formats).
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return b""
+    lines = text.splitlines(keepends=True)
+    by_line: dict[int, str] = {ln: nv for ln, _kp, nv in redactions}
+    out: list[str] = []
+    for i, line in enumerate(lines, 1):
+        if i in by_line:
+            ending = _line_ending(line)
+            out.append(by_line[i] + ending)
+        else:
+            out.append(line)
+    return "".join(out).encode("utf-8")

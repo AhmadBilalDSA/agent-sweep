@@ -21,7 +21,7 @@
 
 ---
 
-**10 agents supported:** Claude Code · Codex · OpenCode · Cursor · Windsurf · Aider · Cline · Gemini CLI · Continue · GitHub Copilot Chat
+**13 agents supported:** Claude Code · Codex · OpenCode · Cursor · Windsurf · Aider · Cline · Gemini CLI · Continue · GitHub Copilot Chat · OpenClaw · Hermes · Goose
 
 **189 detection rules** — AWS, GitHub, Stripe, OpenAI, Anthropic, Google, Slack, HuggingFace, JWT, PEM keys, DB URLs, BIP-39 seed phrases, and [many more](#whats-detected)
 
@@ -140,16 +140,19 @@ The legacy flag form `agentsweep --fix` is still accepted and behaves identicall
 Pick which agent's history to target with `--source`. The default is `claude-code`.
 
 ```bash
-agentsweep scan --source claude-code       # ~/.claude/projects/ (default)
-agentsweep scan --source codex             # ~/.codex/sessions/
-agentsweep scan --source opencode          # OpenCode SQLite store
-agentsweep scan --source cursor            # Cursor history
-agentsweep scan --source windsurf          # Windsurf history
-agentsweep scan --source aider             # ~/.aider/
-agentsweep scan --source cline             # Cline history
-agentsweep scan --source gemini-cli        # Gemini CLI history
-agentsweep scan --source continue-vscode   # Continue (VS Code) history
+agentsweep scan --source claude-code          # ~/.claude/projects/ (default)
+agentsweep scan --source codex                # ~/.codex/sessions/
+agentsweep scan --source opencode             # OpenCode SQLite store
+agentsweep scan --source cursor               # Cursor history
+agentsweep scan --source windsurf             # Windsurf history
+agentsweep scan --source aider                # ~/.aider/
+agentsweep scan --source cline                # Cline history
+agentsweep scan --source gemini-cli           # Gemini CLI history
+agentsweep scan --source continue-vscode      # Continue (VS Code) history
 agentsweep scan --source github-copilot-chat  # GitHub Copilot Chat history
+agentsweep scan --source openclaw             # OpenClaw ~/.openclaw/
+agentsweep scan --source hermes               # Hermes Agent ~/.hermes/state.db
+agentsweep scan --source goose                # Goose ~/.local/share/goose/
 ```
 
 Override the default root directory to scan any arbitrary folder:
@@ -212,7 +215,7 @@ A redactor that corrupts your history is strictly worse than the leak it's fixin
 7. **mtime window.** Refuses files modified in the last 60 seconds (likely an active session). `--force` overrides.
 8. **Running-process check.** Refuses if a Claude Code process appears to be running. `--force` overrides.
 9. **Alpha-stage production gate.** `--fix` against the default `~/.claude/projects/` root requires `--allow-production` until v1.0.
-10. **Audit log.** Every write appends SHA256 before/after and path to `~/.claude/agentsweep-audit.jsonl`.
+10. **Audit log.** Every write appends SHA256 before/after and path to `~/.agentsweep/audit.jsonl`.
 
 ## Recovery
 
@@ -256,6 +259,12 @@ OpenCode support was added in v0.1.1. Run `pip install --upgrade agentsweep` or 
 
 **Does agentsweep send my data anywhere?**
 No. It is fully offline — zero network calls during scanning or redacting. The only optional network call is the background update check, which only fetches the latest version number from PyPI.
+
+## Contributors
+
+Thanks to everyone who has contributed code, bug reports, and ideas.
+
+[![Contributors](https://contrib.rocks/image?repo=Ishannaik/agent-sweep)](https://github.com/Ishannaik/agent-sweep/graphs/contributors)
 
 ## License
 

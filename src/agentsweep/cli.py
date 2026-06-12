@@ -62,8 +62,12 @@ def _background_update_notice(args: argparse.Namespace) -> None:
     - ``args.json`` is True (machine-readable output must stay clean), or
     - stdout is not a tty (piped / redirected).
     """
-    # Guard: skip in non-interactive / machine-readable contexts.
+    # Guard: skip in non-interactive / machine-readable contexts, or when the
+    # user has explicitly opted out via env var (useful in CI / slow networks).
+    import os
     try:
+        if os.environ.get("AGENTSWEEP_NO_UPDATE"):
+            return
         if getattr(args, "json", False):
             return
         if not sys.stdout.isatty():
