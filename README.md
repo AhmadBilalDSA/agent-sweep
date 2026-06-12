@@ -60,6 +60,32 @@ asweep                          # run — interactive menu guides you through ev
 
 That's it. No virtualenv to activate, no PATH fiddling — `uv tool install` gives the command its own isolated environment.
 
+## How it works
+
+agentsweep runs a fixed 5-stage pipeline. `scan` stops after stage 3; `fix` continues through redaction.
+
+```mermaid
+flowchart LR
+    A("🔍 DISCOVER\nwalk history dirs\nstream file list") --> B("⚡ SCAN\nAho-Corasick pre-filter\n189 regex rules + BIP-39")
+    B --> C{"secrets\nfound?"}
+    C -- "none" --> D("✅ CLEAN\nexit 0")
+    C -- "found" --> E("📋 FINDINGS\nshow report\nexit 1")
+    E -. "scan only" .-> F("⚠️ ROTATE\nkeys still live")
+    E -- "type REDACT" --> G("✏️ REDACT\natomic write · .bak backup\npost-write JSON validation")
+    G --> H("🔑 ROTATE\nper-provider\nrevocation links")
+
+    style A fill:#1e3a5f,color:#fff,stroke:#2d5986
+    style B fill:#1e3a5f,color:#fff,stroke:#2d5986
+    style C fill:#4a3728,color:#fff,stroke:#7a5c3f
+    style D fill:#1a4731,color:#fff,stroke:#2d7a52
+    style E fill:#4a3a1e,color:#fff,stroke:#7a6030
+    style F fill:#4a2020,color:#fff,stroke:#8b3a3a
+    style G fill:#1e3a5f,color:#fff,stroke:#2d5986
+    style H fill:#2d1e4a,color:#fff,stroke:#5a3a8b
+```
+
+Every write is protected by 8 safety invariants — atomic replace, mandatory `.bak` backup, symlink rejection, mtime/process gates, and post-write JSONL validation. `agentsweep undo` restores from backups.
+
 ## Install
 
 **Recommended — isolated, no venv conflicts:**
