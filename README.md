@@ -15,8 +15,9 @@
 [![Stars](https://img.shields.io/github/stars/Ishannaik/agent-sweep?style=social)](https://github.com/Ishannaik/agent-sweep/stargazers)
 [![Visitors](https://visitor-badge.laobi.icu/badge?page_id=Ishannaik.agent-sweep)](https://github.com/Ishannaik/agent-sweep)
 
-> API keys, tokens, DB URLs, crypto seed phrases — anything you pasted into an AI coding agent is sitting in plain text on disk.
-> **agentsweep finds them and redacts them in place. Your files never leave your machine.**
+> **Prevention:** Don't paste API keys into cloud-backed AI agents at all — the key transits the provider's servers before it ever hits your disk.
+>
+> **If you already did:** agentsweep removes the remaining local attack vector — supply-chain malware and compromised packages that scan your disk for credentials. Your files never leave your machine.
 
 ---
 
