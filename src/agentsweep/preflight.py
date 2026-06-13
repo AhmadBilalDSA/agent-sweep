@@ -129,6 +129,96 @@ OPEN_INTERPRETER_MARKERS: tuple[str, ...] = (
     "interpreter.exe",
 )
 
+WARP_MARKERS: tuple[str, ...] = (
+    "warp-terminal",
+    "dev.warp.Warp",
+    "/warp ",
+    "warp.exe",
+)
+
+GROK_CLI_MARKERS: tuple[str, ...] = (
+    "superagent-ai/grok-cli",
+    "grok-cli",
+    "/grok ",
+    "grok.cmd",
+)
+
+KIRO_CLI_MARKERS: tuple[str, ...] = (
+    "kiro-cli",
+    "/kiro ",
+    "kiro.exe",
+)
+
+KIRO_MARKERS: tuple[str, ...] = (
+    "kiro.kiroagent",
+    "kirodotdev",
+    "/Kiro ",
+)
+
+ZED_MARKERS: tuple[str, ...] = (
+    "zed-industries",
+    "/zed ",
+    "zed.exe",
+    " Zed.app",
+)
+
+CODEBUFF_MARKERS: tuple[str, ...] = (
+    "codebuff",
+    "manicode",
+    "/codebuff ",
+)
+
+PLANDEX_MARKERS: tuple[str, ...] = (
+    "plandex",
+    "/plandex ",
+    "plandex.exe",
+    "plandex-server",
+)
+
+QWEN_CODE_MARKERS: tuple[str, ...] = (
+    "qwen-code",
+    "qwenlm/qwen-code",
+    "/qwen ",
+    "qwen.cmd",
+)
+
+PEARAI_MARKERS: tuple[str, ...] = (
+    "PearAI.pearai-roo-cline",
+    "pearai",
+    "/pearai ",
+)
+
+TRAE_MARKERS: tuple[str, ...] = (
+    "trae-ai",
+    "/trae ",
+    "Trae.exe",
+    " Trae.app",
+)
+
+VOID_MARKERS: tuple[str, ...] = (
+    "voideditor",
+    "void-editor",
+    "/void ",
+)
+
+JUNIE_MARKERS: tuple[str, ...] = (
+    "jetbrains/junie",
+    "/junie ",
+    "junie.exe",
+)
+
+MENTAT_MARKERS: tuple[str, ...] = (
+    "abanteai/mentat",
+    "/mentat ",
+    "mentat.exe",
+)
+
+JETBRAINS_AI_MARKERS: tuple[str, ...] = (
+    "jetbrains-ai",
+    "ai.assistant",
+    "ChatSessionStateTemp",
+)
+
 
 def is_agent_running(markers: tuple[str, ...]) -> tuple[bool, str]:
     """Best-effort detection of a running agent process by marker substrings.

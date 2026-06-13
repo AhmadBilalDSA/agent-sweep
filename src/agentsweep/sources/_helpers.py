@@ -158,9 +158,17 @@ def _apply_jsonl_redactions(
     return "".join(out)
 
 
+# Whole-file JSON is json.loads'd entirely into memory before scanning, so a
+# multi-GB document (e.g. a Kiro IDE session) would OOM before the pipeline's
+# per-file scan budget could help. Skip documents above this size.
+_MAX_JSON_FILE_BYTES = 100_000_000
+
+
 def _iter_json_file_strings(path: Path) -> Iterator[tuple[int, KeyPath, str]]:
     """Yield all string values from a whole-file JSON object/array."""
     try:
+        if path.stat().st_size > _MAX_JSON_FILE_BYTES:
+            return
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return
