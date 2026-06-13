@@ -114,6 +114,8 @@ class _GenericSqliteSource(Source):
     hard-code. Scans every text column of every table read-only; redaction
     UPDATEs the same cells via the copy-and-verify path."""
 
+    experimental = True
+
     def __init__(self, root: Path | None = None):
         self.root = root or self.default_root()
 
@@ -249,6 +251,7 @@ class CodebuffSource(Source):
     name = "codebuff"
     display_name = "Codebuff"
     process_markers = CODEBUFF_MARKERS
+    experimental = True
 
     def __init__(self, root: Path | None = None):
         self.root = root or self.default_root()
@@ -288,6 +291,7 @@ class PlandexSource(Source):
     name = "plandex"
     display_name = "Plandex"
     process_markers = PLANDEX_MARKERS
+    experimental = True
 
     _GLOB = "orgs/*/plans/*/conversation/*.json"
 
@@ -332,6 +336,7 @@ class QwenCodeSource(GeminiCliSource):
     name = "qwen-code"
     display_name = "Qwen Code"
     process_markers = QWEN_CODE_MARKERS
+    experimental = True
 
     @classmethod
     def default_root(cls) -> Path:
@@ -363,6 +368,7 @@ class PearAiSource(ClineSource):
     name = "pearai"
     display_name = "PearAI"
     process_markers = PEARAI_MARKERS
+    experimental = True
 
     @classmethod
     def default_root(cls) -> Path:
@@ -379,6 +385,7 @@ class TraeSource(_VSCodeSqliteSource):
     name = "trae"
     display_name = "Trae"
     process_markers = TRAE_MARKERS
+    experimental = True
 
     @classmethod
     def default_root(cls) -> Path:
@@ -393,6 +400,7 @@ class VoidSource(_VSCodeSqliteSource):
     name = "void"
     display_name = "Void"
     process_markers = VOID_MARKERS
+    experimental = True
 
     @classmethod
     def default_root(cls) -> Path:
@@ -408,6 +416,7 @@ class JunieSource(Source):
     name = "junie"
     display_name = "Junie"
     process_markers = JUNIE_MARKERS
+    experimental = True
 
     def __init__(self, root: Path | None = None):
         self.root = root or self.default_root()
@@ -457,6 +466,7 @@ class MentatSource(Source):
     name = "mentat"
     display_name = "Mentat"
     process_markers = MENTAT_MARKERS
+    experimental = True
 
     def __init__(self, root: Path | None = None):
         self.root = root or self.default_root()
@@ -501,6 +511,7 @@ class JetBrainsAiSource(Source):
     name = "jetbrains-ai"
     display_name = "JetBrains AI Assistant"
     process_markers = JETBRAINS_AI_MARKERS
+    experimental = True
 
     def __init__(self, root: Path | None = None):
         self.root = root or self.default_root()

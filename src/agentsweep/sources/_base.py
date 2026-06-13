@@ -16,6 +16,11 @@ class Source(ABC):
     display_name: str
     root: Path
     process_markers: tuple[str, ...] = ()
+    # True when this source's storage path/format was derived from research
+    # but has NOT been confirmed against a real install — scanning is safe
+    # (a wrong path just finds nothing) but may under-report. Surfaced in the
+    # picker, the scan banner, and the README so users know what's verified.
+    experimental: bool = False
 
     @abstractmethod
     def files(self) -> list[Path]:

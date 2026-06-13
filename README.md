@@ -23,6 +23,8 @@
 
 **29 agents supported:** Claude Code · Codex · OpenCode · Cursor · Windsurf · Aider · Cline · Kilo Code · Roo Code · PearAI · Trae · Void · Gemini CLI · Qwen Code · Continue · Open Interpreter · GitHub Copilot Chat · OpenClaw · Hermes · Goose · Warp · Grok CLI · Kiro CLI · Zed · Codebuff · Plandex · Junie · Mentat · JetBrains AI
 
+> **Experimental sources** (Warp, Grok CLI, Kiro CLI, Zed, Codebuff, Plandex, Qwen Code, PearAI, Trae, Void, Junie, Mentat, JetBrains AI) have storage paths/formats derived from research but **not yet verified against a real install**. Scanning is safe — a wrong path simply finds nothing — but they may under-report until confirmed. They're tagged `(experimental)` in the picker and print a notice on scan.
+
 **191 detection rules** — AWS, GitHub, Stripe, OpenAI, Anthropic, Google, Slack, Discord, HuggingFace, JWT, PEM keys, DB URLs, BIP-39 seed phrases, and [many more](#whats-detected)
 
 **Alpha** — every destructive step is gated, backed up, and reversible with one command

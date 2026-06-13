@@ -60,6 +60,11 @@ def run(args, *, _findings_out: list | None = None) -> int:
 
     if not args.json:
         ui.banner(__version__)
+        if getattr(source, "experimental", False):
+            ui.warn_line(
+                f"{source.display_name} is an experimental source — its history "
+                f"path/format is inferred from research and not yet verified "
+                f"against a real install, so it may find nothing")
 
     if not args.json:
         files: list[Path] = []

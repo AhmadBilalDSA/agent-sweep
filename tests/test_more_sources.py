@@ -209,3 +209,15 @@ def test_all_new_sources_registered_with_distinct_roots() -> None:
     # and no two sources share the same root.
     roots = {slug: str(cls().default_root()) for slug, cls in SOURCES.items()}
     assert len(set(roots.values())) == len(roots), "sources share a default_root"
+
+
+def test_new_sources_flagged_experimental() -> None:
+    experimental = {
+        "warp", "grok-cli", "kiro-cli", "zed", "codebuff", "plandex",
+        "qwen-code", "pearai", "trae", "void", "junie", "mentat", "jetbrains-ai",
+    }
+    for slug in experimental:
+        assert SOURCES[slug].experimental, f"{slug} should be experimental"
+    # Verified / battle-tested sources must NOT be flagged experimental.
+    for slug in ("claude-code", "cursor", "cline", "kilo-code", "open-interpreter"):
+        assert not SOURCES[slug].experimental, f"{slug} must stay stable"

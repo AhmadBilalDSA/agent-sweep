@@ -155,7 +155,9 @@ def source_picker() -> list[str] | None:
     from ..sources import SOURCES  # late import: avoids top-level cycle
 
     source_entries: list[tuple[str, str]] = [
-        (SOURCES[k].display_name, k)
+        (SOURCES[k].display_name
+         + ("  (experimental)" if getattr(SOURCES[k], "experimental", False) else ""),
+         k)
         for k in SOURCES
     ]
     # "All sources" first, then each source, then Custom folder + Run Scan button.
