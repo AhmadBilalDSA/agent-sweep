@@ -158,15 +158,17 @@ def source_picker() -> list[str] | None:
         (SOURCES[k].display_name, k)
         for k in SOURCES
     ]
-    # Custom folder row + Run Scan button
+    # "All sources" first, then each source, then Custom folder + Run Scan button.
     rows: list[tuple[str, str]] = [
+        ("All sources", "scan every agent in parallel"),
+    ] + [
         (display, key)
         for display, key in source_entries
     ] + [
         ("Custom folder…", "scan a specific directory"),
         ("[ Run Scan ]",   ""),
     ]
-    source_keys = list(SOURCES.keys()) + ["__custom__"]
+    source_keys = ["__all__"] + list(SOURCES.keys()) + ["__custom__"]
     button_idx = len(rows) - 1
 
     result = _run_menu(

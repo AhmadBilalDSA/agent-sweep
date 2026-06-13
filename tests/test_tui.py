@@ -202,8 +202,9 @@ def test_source_picker_default_when_nothing_selected():
     """Pressing Run with nothing checked defaults to claude-code."""
     from agentsweep.sources import SOURCES
     n_sources = len(SOURCES)
-    # Navigate to Run Scan button: it's at index n_sources + 1 (custom + run)
-    run_idx = n_sources + 1
+    # Rows: "All sources" + n_sources + Custom folder + Run, so the Run button
+    # is at index n_sources + 2.
+    run_idx = n_sources + 2
     keys_seq = [_keys.DOWN] * run_idx + [_keys.ENTER]
     it = iter(keys_seq)
     with patch("agentsweep.ui.picker._keys.read_key", side_effect=it):
@@ -216,12 +217,12 @@ def test_source_picker_default_when_nothing_selected():
 
 
 def test_source_picker_select_first_source():
-    """Space on first row (claude-code) then navigate to Run and press Enter."""
+    """DOWN to the first source (claude-code, now index 1), Space, then Run."""
     from agentsweep.sources import SOURCES
     n_sources = len(SOURCES)
-    run_idx = n_sources + 1
-    # Space to select first, then DOWN to run, ENTER
-    keys_seq = [_keys.SPACE] + [_keys.DOWN] * run_idx + [_keys.ENTER]
+    run_idx = n_sources + 2
+    # DOWN onto claude-code, Space to select, then DOWN to the Run button, ENTER
+    keys_seq = [_keys.DOWN, _keys.SPACE] + [_keys.DOWN] * (run_idx - 1) + [_keys.ENTER]
     it = iter(keys_seq)
     with patch("agentsweep.ui.picker._keys.read_key", side_effect=it):
         with patch("agentsweep.ui.picker.Live") as mock_live:
@@ -231,6 +232,23 @@ def test_source_picker_select_first_source():
             result = source_picker()
     assert isinstance(result, list)
     assert "claude-code" in result
+
+
+def test_source_picker_all_sources_returns_sentinel():
+    """Space on the first row ('All sources') returns the __all__ sentinel."""
+    from agentsweep.sources import SOURCES
+    n_sources = len(SOURCES)
+    run_idx = n_sources + 2
+    # Space to check 'All sources' (row 0), then navigate to Run and Enter.
+    keys_seq = [_keys.SPACE] + [_keys.DOWN] * run_idx + [_keys.ENTER]
+    it = iter(keys_seq)
+    with patch("agentsweep.ui.picker._keys.read_key", side_effect=it):
+        with patch("agentsweep.ui.picker.Live") as mock_live:
+            mock_live.return_value.__enter__ = lambda s: mock_live.return_value
+            mock_live.return_value.__exit__ = lambda s, *a: False
+            mock_live.return_value.update = lambda *a: None
+            result = source_picker()
+    assert result == ["__all__"]
 
 
 # ── menu.py dispatch ──────────────────────────────────────────────────────────

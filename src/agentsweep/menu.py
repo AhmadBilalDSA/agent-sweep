@@ -118,6 +118,10 @@ def _run_tui_menu(main) -> int:
                 continue
             if picks is None:
                 continue  # user pressed Back
+            if "__all__" in picks:
+                _scan_all_sources()
+                _pause()
+                continue
             for name in picks:
                 if name == "__custom__":
                     root = _ask_folder()
