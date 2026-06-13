@@ -38,7 +38,8 @@ def _opt(args, name: str, default=None):
     return getattr(args, name, default)
 
 
-def run(args, *, _findings_out: list | None = None) -> int:
+def run(args, *, _findings_out: list | None = None,
+        _force_recoverable_out: list | None = None) -> int:
     """Execute one scan (and optional redact) run. Exit codes:
     0 clean · 1 findings (scan-only) · 2 gate-blocked, write error, or bad path.
 
@@ -135,21 +136,24 @@ def run(args, *, _findings_out: list | None = None) -> int:
             _findings_out.append((source, found_by_file))
         return 1
 
-    gate_err = _preflight_gates(source, source_cls, args)
+    gate_err, gate_recoverable = _preflight_gates(source, source_cls, args)
     if gate_err is not None:
         # The user who most needs rotation guidance is the one we just
         # refused to redact for — the keys are confirmed live.
         ui.stage(5, "warn", "ROTATE", "these keys are still live")
         ui.rotation_panel(_rotation_items(found_by_file))
+        if _force_recoverable_out is not None:
+            _force_recoverable_out.append(gate_recoverable)
         return gate_err
 
-    rows, errors = _redact_all(
+    rows, errors, recoverable = _redact_all(
         source=source,
         found_by_file=found_by_file,
         backup=not args.no_backup,
         force=args.force,
     )
-
+    if _force_recoverable_out is not None:
+        _force_recoverable_out.append(recoverable)
     return _render_redact_result(rows, errors, found_by_file)
 
 
@@ -160,8 +164,13 @@ def _render_redact_result(rows, errors: int, found_by_file: dict) -> int:
     exit code: 0 if every write succeeded, else 2.
     """
     ok_count = sum(1 for status, _, _ in rows if status == "ok")
-    if errors == 0:
+    already = sum(1 for status, _, note in rows
+                  if status == "skip" and "already redacted" in note)
+    redacted = ok_count + already  # this pass plus any prior pass
+    if errors == 0 and ok_count:
         ui.stage(4, "ok", "REDACT", f"{ok_count}/{len(rows)} file(s) rewritten")
+    elif errors == 0 and already:
+        ui.stage(4, "ok", "REDACT", f"{already} file(s) already redacted")
     elif ok_count:
         ui.stage(4, "warn", "REDACT", f"{ok_count}/{len(rows)} file(s) rewritten")
     else:
@@ -169,7 +178,7 @@ def _render_redact_result(rows, errors: int, found_by_file: dict) -> int:
     for status, path_display, note in rows:
         ui.redact_row(status, path_display, note)
 
-    if ok_count:
+    if redacted:
         ui.stage(5, "warn", "ROTATE", "redacted locally", "keys live until rotated")
     else:
         ui.stage(5, "warn", "ROTATE", "nothing redacted", "these keys are still live")
@@ -177,7 +186,8 @@ def _render_redact_result(rows, errors: int, found_by_file: dict) -> int:
     return 0 if errors == 0 else 2
 
 
-def redact_findings(args, source: Source, found_by_file: dict) -> int:
+def redact_findings(args, source: Source, found_by_file: dict, *,
+                    _force_recoverable_out: list | None = None) -> int:
     """Apply REDACT + ROTATE using pre-computed findings; skip DISCOVER + SCAN.
 
     Called from offer_redaction() when the first scan cached its results via
@@ -185,18 +195,22 @@ def redact_findings(args, source: Source, found_by_file: dict) -> int:
     Exit codes: 0 clean, 2 gate-blocked or write error.
     """
     source_cls = SOURCES[args.source]
-    gate_err = _preflight_gates(source, source_cls, args)
+    gate_err, gate_recoverable = _preflight_gates(source, source_cls, args)
     if gate_err is not None:
         ui.stage(5, "warn", "ROTATE", "these keys are still live")
         ui.rotation_panel(_rotation_items(found_by_file))
+        if _force_recoverable_out is not None:
+            _force_recoverable_out.append(gate_recoverable)
         return gate_err
 
-    rows, errors = _redact_all(
+    rows, errors, recoverable = _redact_all(
         source=source,
         found_by_file=found_by_file,
         backup=not args.no_backup,
         force=args.force,
     )
+    if _force_recoverable_out is not None:
+        _force_recoverable_out.append(recoverable)
     return _render_redact_result(rows, errors, found_by_file)
 
 
@@ -554,14 +568,18 @@ def _redact_all(
     found_by_file: dict,
     backup: bool,
     force: bool,
-) -> tuple[list[tuple[str, str, str]], int]:
-    """Apply redactions, returning ((status, path_display, note) rows, error count).
+) -> tuple[list[tuple[str, str, str]], int, bool]:
+    """Apply redactions, returning (rows, error_count, force_recoverable).
 
-    Rows are collected rather than printed so the REDACT stage line can
-    report the real outcome (ok/partial/all-failed) above them.
+    Rows are (status, path_display, note); status is "ok", "skip" or "fail".
+    A file whose .bak already exists was redacted in a prior pass, so it is a
+    "skip" ("already redacted"), NOT an error. `force_recoverable` is True if
+    any failure was an active-session gate (mtime) that --force could bypass —
+    the caller uses it to decide whether offering --force is worthwhile.
     """
     rows: list[tuple[str, str, str]] = []
     errors = 0
+    recoverable = False
     for path, items in found_by_file.items():
         display = ui.rel(path, source.root)
         try:
@@ -569,6 +587,7 @@ def _redact_all(
         except SafetyError as e:
             rows.append(("skip", display, str(e)))
             errors += 1
+            recoverable = recoverable or e.force_recoverable
             continue
 
         redactions = _build_redactions(items)
@@ -576,19 +595,31 @@ def _redact_all(
             new_content = source.apply_redactions(path, redactions)
             record = safe_write(path, new_content, backup=backup,
                                 fmt=source.content_format(path))
-            note = f".bak: {record.backup.name}" if record.backup else "no backup"
-            rows.append(("ok", display, note))
+            if record.unchanged:
+                # File was already in the redacted state — calm skip, not a fail.
+                rows.append(("skip", display, "already redacted (no change)"))
+            else:
+                note = (f".bak: {record.backup.name}" if record.backup
+                        else "no backup")
+                rows.append(("ok", display, note))
         except SafetyError as e:
             rows.append(("fail", display, str(e)))
             errors += 1
+            recoverable = recoverable or e.force_recoverable
         except Exception as e:
             rows.append(("fail", display, f"{type(e).__name__}: {e}"))
             errors += 1
-    return rows, errors
+    return rows, errors, recoverable
 
 
-def _preflight_gates(source: Source, source_cls: type[Source], args) -> int | None:
-    """Return an exit code if a gate blocks --fix; otherwise None to continue."""
+def _preflight_gates(source: Source, source_cls: type[Source],
+                     args) -> tuple[int | None, bool]:
+    """Check the --fix gates. Returns (exit_code_or_None, force_recoverable).
+
+    force_recoverable is True only when the block is the active-session
+    (running-agent) gate that --force can bypass; the production-root gate is
+    cleared by --allow-production, not --force, so it is not force-recoverable.
+    """
     if is_production_root(source, source_cls) and not args.allow_production:
         ui.stage(4, "fail", "REDACT", "blocked by safety gate")
         ui.gate_panel("alpha safety gate", [
@@ -599,7 +630,7 @@ def _preflight_gates(source: Source, source_cls: type[Source], args) -> int | No
             "  1. copy history elsewhere and pass --root <that path>, OR",
             "  2. re-run with --allow-production (explicit opt-in).",
         ])
-        return 2
+        return 2, False
 
     running, marker = is_agent_running(source.process_markers)
     if running and not args.force:
@@ -609,14 +640,14 @@ def _preflight_gates(source: Source, source_cls: type[Source], args) -> int | No
             f"Close all {source.display_name} sessions before --fix,",
             "or pass --force to proceed anyway.",
         ])
-        return 2
+        return 2, True
     if running and args.force:
         ui.warn_line(
             f"--force: proceeding while {source.display_name} appears to be "
             f"running (marker: {marker!r})"
         )
 
-    return None
+    return None, False
 
 
 def _build_redactions(items: list[tuple[int, list, str, Finding]]) -> list[tuple[int, list, str]]:

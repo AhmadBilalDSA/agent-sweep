@@ -371,20 +371,29 @@ def offer_redaction(args, *, source=None, found_by_file=None) -> int | None:
     fix_args.fix = True
     fix_args.allow_production = True
 
+    # rec captures whether the last attempt's failure was force-recoverable
+    # (an active-session gate) — only then is offering --force meaningful.
+    rec: list[bool] = []
     if source is not None and found_by_file is not None:
         from .pipeline import redact_findings
 
         def _apply(a):
-            return redact_findings(a, source, found_by_file)
+            return redact_findings(a, source, found_by_file,
+                                   _force_recoverable_out=rec)
     else:
         from .pipeline import run
-        _apply = run
+
+        def _apply(a):
+            return run(a, _force_recoverable_out=rec)
 
     code = _apply(fix_args)
-    if code == 2 and not fix_args.force:
+    # Offer --force ONLY when the block was an active-session gate that --force
+    # can bypass. For a post-redaction validation failure or a "backup already
+    # exists" (already-redacted) file, --force can't help, so don't prompt.
+    if code == 2 and not fix_args.force and rec and rec[-1]:
         try:
             retry = input(
-                "  a safety gate blocked the redaction (see above).\n"
+                "  an active-session gate blocked the redaction (see above).\n"
                 "  override with --force? Only safe if no agent session is "
                 "actively writing. [y/N]: "
             ).strip().lower()

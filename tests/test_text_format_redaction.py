@@ -72,7 +72,7 @@ def test_aider_markdown_fix_end_to_end(tmp_path: Path) -> None:
     source = AiderSource(root=root)
     assert hist in source.files()
 
-    rows, errors = _redact_all(source, _scan(source, hist),
+    rows, errors, _ = _redact_all(source, _scan(source, hist),
                                backup=True, force=True)
     # Before: always ("fail", ..., "line 1 is not valid JSON ...").
     assert errors == 0
@@ -100,7 +100,7 @@ def test_opencode_legacy_json_fix_end_to_end(tmp_path: Path) -> None:
     source = OpenCodeSource(root=root)
     assert source.files() == [f]
 
-    rows, errors = _redact_all(source, _scan(source, f),
+    rows, errors, _ = _redact_all(source, _scan(source, f),
                                backup=True, force=True)
     assert errors == 0
     assert rows[0][0] == "ok"
@@ -125,7 +125,7 @@ def test_cline_task_json_fix_end_to_end(tmp_path: Path) -> None:
     source = ClineSource(root=root)
     assert source.files() == [f]
 
-    rows, errors = _redact_all(source, _scan(source, f),
+    rows, errors, _ = _redact_all(source, _scan(source, f),
                                backup=True, force=True)
     assert errors == 0
     assert rows[0][0] == "ok"
@@ -151,7 +151,7 @@ def test_gemini_checkpoint_json_is_scanned_and_fixed(tmp_path: Path) -> None:
     # invisible to the scan.
     assert any(SECRET in v for _, _, v in source.iter_strings(f))
 
-    rows, errors = _redact_all(source, _scan(source, f),
+    rows, errors, _ = _redact_all(source, _scan(source, f),
                                backup=True, force=True)
     assert errors == 0
     assert rows[0][0] == "ok"
@@ -174,7 +174,7 @@ def test_windsurf_memory_fix_outside_user_root_and_undo(tmp_path: Path) -> None:
     source = WindsurfSource(root=user_root)
     assert mem in source.files()
 
-    rows, errors = _redact_all(source, _scan(source, mem),
+    rows, errors, _ = _redact_all(source, _scan(source, mem),
                                backup=True, force=True)
     # Before roots(): always ("skip", ..., "outside source root").
     assert errors == 0

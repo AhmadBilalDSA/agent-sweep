@@ -21,7 +21,18 @@ def audit_path() -> Path:
 
 
 class SafetyError(Exception):
-    pass
+    """A refusal to modify a file.
+
+    `force_recoverable` is True only for the "active session" gates (file
+    modified < MIN_AGE_SECONDS, or the agent appears to be running) that
+    `--force` can legitimately bypass. Content-validation failures and the
+    no-clobber backup check are never force-recoverable — `--force` can't fix
+    them — so callers must not offer `--force` for those.
+    """
+
+    def __init__(self, *args, force_recoverable: bool = False):
+        super().__init__(*args)
+        self.force_recoverable = force_recoverable
 
 
 @dataclass
@@ -32,6 +43,7 @@ class WriteRecord:
     backup: Path | None
     bytes_before: int
     bytes_after: int
+    unchanged: bool = False  # True when the redaction was a no-op (already done)
 
 
 def _sha256(data: bytes) -> str:
@@ -83,7 +95,8 @@ def safety_check(path: Path, source_root: Path | Iterable[Path],
         if age < MIN_AGE_SECONDS:
             raise SafetyError(
                 f"File modified {age:.0f}s ago (minimum {MIN_AGE_SECONDS}s); "
-                f"likely an active session. Close Claude Code or use --force."
+                f"likely an active session. Close Claude Code or use --force.",
+                force_recoverable=True,
             )
 
 
@@ -141,6 +154,15 @@ def safe_write(path: Path, new_content: str | bytes,
                 )
 
     new_hash = _sha256(new_bytes)
+
+    if new_bytes == original_bytes:
+        # Idempotent no-op: the file is already in the target (redacted) state
+        # — e.g. it was redacted in a previous pass, and re-applying the same
+        # redaction changes nothing. Don't create a backup or rewrite; report
+        # it so the caller renders a calm "already redacted" skip instead of a
+        # confusing FAIL on the no-clobber backup check.
+        return WriteRecord(path, original_hash, new_hash, None,
+                           len(original_bytes), len(new_bytes), unchanged=True)
 
     backup_path: Path | None = None
     if backup:

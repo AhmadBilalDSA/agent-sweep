@@ -50,7 +50,7 @@ def _scan(source, f: Path):
 
 
 def _ok(source, f: Path):
-    rows, errors = _redact_all(source, _scan(source, f), backup=True, force=True)
+    rows, errors, _ = _redact_all(source, _scan(source, f), backup=True, force=True)
     assert errors == 0, rows
     assert rows[0][0] == "ok"
 

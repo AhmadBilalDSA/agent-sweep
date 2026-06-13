@@ -57,7 +57,7 @@ def _cline_task(root: Path) -> Path:
 
 
 def _round_trip(source, f: Path) -> str:
-    rows, errors = _redact_all(source, _scan(source, f), backup=True, force=True)
+    rows, errors, _ = _redact_all(source, _scan(source, f), backup=True, force=True)
     assert errors == 0
     assert rows[0][0] == "ok"
     after = f.read_text(encoding="utf-8")
