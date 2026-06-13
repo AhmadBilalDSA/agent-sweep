@@ -52,7 +52,7 @@ def _isolated_home(tmp_path, monkeypatch):
 
 def _scan(source, f: Path):
     """Mirror the pipeline's SCAN stage for a single file."""
-    _, items, _, _ = _scan_file(source, f, ignores=None)
+    _, items, _, _, _ = _scan_file(source, f, ignores=None)
     assert items, "fixture secret should be detected"
     return {f: items}
 

@@ -639,9 +639,18 @@ except ImportError:  # pragma: no cover - exercised only without the wheel
     PREFILTER_BACKEND = "substring"
 
 
+# Secrets are short. A single string longer than this is almost always pasted
+# data or a serialized cache blob, not a place a secret lives — and scanning a
+# multi-MB string against ~190 rules plus the mnemonic detector costs seconds.
+# Bound per-string work so one giant value can't stall a scan.
+_MAX_SCAN_CHARS = 1_000_000
+
+
 def scan_text(text: str) -> list[Finding]:
     from .mnemonic import detect_mnemonics  # late import: avoids a cycle
 
+    if len(text) > _MAX_SCAN_CHARS:
+        text = text[:_MAX_SCAN_CHARS]
     lowered = text.lower()
     findings: list[Finding] = []
     # sorted() keeps RULES order so overlap dedupe tie-breaks are unchanged.

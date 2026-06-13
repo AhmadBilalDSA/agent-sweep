@@ -296,7 +296,7 @@ def test_parallel_scan_same_results_as_sequential(tmp_path):
     files = list(tmp_path.glob("*.jsonl"))
     assert len(files) == 6  # ensures threadpool path is taken (>4)
 
-    found, scanned, suppressed = _scan_all(source, files, ignores=None)
+    found, scanned, suppressed, _ = _scan_all(source, files, ignores=None)
 
     assert suppressed == 0
     assert len(found) == 1, f"expected 1 dirty file, got {len(found)}: {list(found)}"

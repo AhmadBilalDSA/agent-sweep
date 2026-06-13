@@ -238,7 +238,7 @@ def _scan_all_sources() -> None:
             for fut in as_completed(future_meta):
                 name, src = future_meta[fut]
                 try:
-                    path, items, sc, _ = fut.result()
+                    path, items, sc, _, _trunc = fut.result()
                 except Exception:
                     continue
                 total_strings += sc

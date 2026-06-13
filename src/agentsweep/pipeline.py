@@ -85,19 +85,26 @@ def run(args, *, _findings_out: list | None = None) -> int:
                else ignore_mod.load([source.root, Path.cwd()]))
 
     if args.json:
-        found_by_file, _, suppressed = _scan(source, files, ignores)
+        found_by_file, _, suppressed, truncated = _scan(source, files, ignores)
+        if truncated:
+            print(f"warning: {len(truncated)} file(s) exceeded the scan budget "
+                  f"and were truncated", file=sys.stderr)
         return _output_json(found_by_file, source, output, suppressed)
 
     ui.stage(1, "ok", "DISCOVER", source.name, f"{len(files)} file(s)", source.root)
 
     t0 = time.perf_counter()
     with ui.scan_progress(len(files)) as progress:
-        found_by_file, strings_scanned, suppressed = _scan(
+        found_by_file, strings_scanned, suppressed, truncated = _scan(
             source, files, ignores, progress)
     elapsed = time.perf_counter() - t0
 
     ui.stage(2, "ok", "SCAN", f"{len(files)} file(s)",
              f"{strings_scanned} string(s)", f"{elapsed:.1f}s")
+    if truncated:
+        ui.warn_line(f"{len(truncated)} file(s) exceeded the "
+                     f"{_MAX_FILE_SCAN_CHARS // 1_000_000}MB scan budget and were "
+                     f"truncated (likely cache blobs, not conversation text)")
 
     if suppressed:
         ui.warn_line(f"{suppressed} finding(s) suppressed by .agentsweepignore")
@@ -217,24 +224,37 @@ def _scan(source, files, ignores, progress=None):
                      on_file=_on_file, on_finding=_on_finding)
 
 
+# A single history file rarely holds more than a few MB of actual conversation
+# text. Some stores (e.g. a Cursor state.vscdb stuffed with cache JSON) can
+# instead explode into tens of millions of tiny leaf strings — gigabytes of
+# content — which would stall the scan for minutes and, on a worker thread,
+# block Ctrl-C. Stop scanning a file once its text crosses this budget and flag
+# it as truncated so the cap is reported, never silent.
+_MAX_FILE_SCAN_CHARS = 50_000_000
+
+
 def _scan_file(
     source: Source,
     f: Path,
     ignores,
-) -> tuple[Path, list[tuple[int, list, str, Finding]], int, int]:
+) -> tuple[Path, list[tuple[int, list, str, Finding]], int, int, bool]:
     """Scan a single file; safe to call from a thread pool worker.
 
-    Returns (path, findings_list, strings_scanned, suppressed_count).
-    Callbacks are NOT invoked here — the caller dispatches them on the main
-    thread after each future completes, so Rich Live is never touched from a
-    worker thread.
+    Returns (path, findings_list, strings_scanned, suppressed_count, truncated).
+    `truncated` is True when the per-file scan budget was hit and the rest of
+    the file was skipped. Callbacks are NOT invoked here — the caller dispatches
+    them on the main thread after each future completes, so Rich Live is never
+    touched from a worker thread.
     """
     items: list[tuple[int, list, str, Finding]] = []
     strings_scanned = 0
     suppressed = 0
+    scanned_chars = 0
+    truncated = False
     relpath = ui.rel(f, source.root)
     for line_num, keypath, value in source.iter_strings(f):
         strings_scanned += 1
+        scanned_chars += len(value)
         for finding in scan_text(value):
             finding.file = f
             finding.line = line_num
@@ -245,7 +265,10 @@ def _scan_file(
                     suppressed += 1
                     continue
             items.append((line_num, keypath, value, finding))
-    return f, items, strings_scanned, suppressed
+        if scanned_chars > _MAX_FILE_SCAN_CHARS:
+            truncated = True
+            break
+    return f, items, strings_scanned, suppressed, truncated
 
 
 # Maximum parallel workers for file scanning.  Chosen empirically: beyond
@@ -261,10 +284,11 @@ def _scan_all(
     ignores=None,
     on_file=None,
     on_finding=None,
-) -> tuple[dict[Path, list[tuple[int, list, str, Finding]]], int, int]:
+) -> tuple[dict[Path, list[tuple[int, list, str, Finding]]], int, int, list[Path]]:
     out: dict[Path, list[tuple[int, list, str, Finding]]] = {}
     strings_scanned = 0
     suppressed = 0
+    truncated: list[Path] = []
 
     # For tiny workloads the thread-pool overhead exceeds the I/O overlap
     # benefit; fall back to the sequential path for ≤4 files.
@@ -272,14 +296,16 @@ def _scan_all(
         for f in files:
             if on_file is not None:
                 on_file(f)
-            _, items, sc, sup = _scan_file(source, f, ignores)
+            _, items, sc, sup, trunc = _scan_file(source, f, ignores)
             strings_scanned += sc
             suppressed += sup
+            if trunc:
+                truncated.append(f)
             for entry in items:
                 out.setdefault(f, []).append(entry)
                 if on_finding is not None:
                     on_finding(entry[3])
-        return out, strings_scanned, suppressed
+        return out, strings_scanned, suppressed, truncated
 
     workers = min(_SCAN_WORKERS, len(files))
     with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -288,16 +314,18 @@ def _scan_all(
             for f in files
         }
         for fut in as_completed(futures):
-            f, items, sc, sup = fut.result()
+            f, items, sc, sup, trunc = fut.result()
             strings_scanned += sc
             suppressed += sup
+            if trunc:
+                truncated.append(f)
             if on_file is not None:
                 on_file(f)
             for entry in items:
                 out.setdefault(f, []).append(entry)
                 if on_finding is not None:
                     on_finding(entry[3])
-    return out, strings_scanned, suppressed
+    return out, strings_scanned, suppressed, truncated
 
 
 def _table_rows(found_by_file: dict) -> list[tuple[str, str, Path, int]]:

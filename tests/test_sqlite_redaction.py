@@ -57,7 +57,7 @@ def _make_vscdb(db: Path) -> bytes:
 
 def _redact(source, f: Path):
     """Mirror the pipeline's scan -> redactions -> apply composition."""
-    _, items, _, _ = _scan_file(source, f, ignores=None)
+    _, items, _, _, _ = _scan_file(source, f, ignores=None)
     assert items, "fixture secret should be detected"
     return source.apply_redactions(f, _build_redactions(items))
 
