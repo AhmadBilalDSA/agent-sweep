@@ -87,6 +87,7 @@ def run_menu() -> int:
         ui.console.clear()
     ui.big_banner(__version__)
     _passive_update_check()
+    ui.contribute_line()
 
     if RAW_INPUT_AVAILABLE:
         return _run_tui_menu(main)
@@ -139,12 +140,34 @@ def _run_tui_menu(main) -> int:
             _check_updates_interactive()
             _pause()
 
+        elif action == "star":
+            _open_repo()
+            _pause()
+
 
 def _pause() -> None:
     try:
         input("\n  press Enter for the menu...")
     except (EOFError, KeyboardInterrupt):
         print()
+
+
+def _open_repo() -> None:
+    """Open the GitHub repo in a browser and nudge the user to contribute."""
+    import webbrowser
+    from . import __repo__
+
+    star = "★" if ui._encodes(ui.console, "★") else "*"
+    ui.console.print(
+        f"\n  [bold yellow]{star} agentsweep is open source and built by its users.[/]")
+    ui.console.print(
+        "  Star it, file an issue, or add your agent / a detection rule:\n"
+        f"  [yellow]{__repo__}[/]")
+    try:
+        if webbrowser.open(__repo__):
+            ui.console.print("  [dim]opened the repo in your browser...[/]")
+    except Exception:
+        pass
 
 
 # ── Numbered fallback (non-tty / CI / dumb terminal) ─────────────────────────
@@ -172,10 +195,12 @@ def _run_numbered_menu(main) -> int:
             main(_SIMPLE_ACTIONS[_NUMBERED_ACTIONS[choice]])
         elif choice == "6":
             _check_updates_interactive()
-        elif choice in {"7", "q", "quit", "exit"}:
+        elif choice == "7":
+            _open_repo()
+        elif choice in {"8", "q", "quit", "exit"}:
             return 0
         else:
-            ui.warn_line(f"unknown option: {choice!r} — pick 1-7")
+            ui.warn_line(f"unknown option: {choice!r} — pick 1-8")
             continue
 
         try:
@@ -348,7 +373,9 @@ def offer_redaction(args, *, source=None, found_by_file=None) -> int | None:
 
     if source is not None and found_by_file is not None:
         from .pipeline import redact_findings
-        _apply = lambda a: redact_findings(a, source, found_by_file)
+
+        def _apply(a):
+            return redact_findings(a, source, found_by_file)
     else:
         from .pipeline import run
         _apply = run

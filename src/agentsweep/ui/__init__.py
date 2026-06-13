@@ -24,6 +24,7 @@ from .banner import banner, big_banner  # noqa: F401
 from .progress import scan_progress  # noqa: F401
 from .shutdown import shutdown_notice  # noqa: F401
 from .widgets import (  # noqa: F401
+    contribute_line,
     findings_table,
     gate_panel,
     menu_options,

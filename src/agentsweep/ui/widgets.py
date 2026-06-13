@@ -48,7 +48,10 @@ def menu_options() -> None:
     grid.add_row("[4]", "Undo last redaction", "restores .bak backups")
     grid.add_row("[5]", "Findings as JSON", "machine-readable")
     grid.add_row("[6]", "Check for updates", "")
-    grid.add_row("[7]", "Quit", "")
+    star = "★" if _encodes(console, "★") else "*"
+    grid.add_row("[7]", "Star / contribute",
+                 f"{star} open the repo - add your agent, file issues, PRs")
+    grid.add_row("[8]", "Quit", "")
     console.print(Padding(Panel(
         grid,
         title="MENU",
@@ -164,3 +167,19 @@ def warn_line(message: str) -> None:
     ic = _icons(err_console)
     err_console.print(Text(f"  {ic['warn']} {_safe(err_console, message)}",
                            style="yellow"), soft_wrap=True)
+
+
+def contribute_line() -> None:
+    """A one-line nudge: agentsweep is open source, shaped by its users.
+
+    Never called on --json / non-tty paths (callers gate on that), so
+    machine output stays clean.
+    """
+    from .. import __repo__
+    star = "★" if _encodes(console, "★") else "*"
+    t = Text("  ")
+    t.append(f"{star} ", style="bold yellow")
+    t.append("agentsweep is open source, built by its users - ", style="dim")
+    t.append("star it & add your agent: ", style="dim")
+    t.append(_safe(console, __repo__), style="yellow")
+    console.print(t)

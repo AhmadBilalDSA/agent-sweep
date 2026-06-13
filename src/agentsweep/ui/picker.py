@@ -127,10 +127,11 @@ _ACTION_ROWS: list[tuple[str, str]] = [
     ("Undo last redaction",   "restores .bak backups"),
     ("Findings as JSON",      "read-only · machine-readable"),
     ("Check for updates",     ""),
+    ("Star / contribute",     "★ open the repo — add your agent, PRs welcome"),
     ("Quit",                  ""),
 ]
 
-_ACTION_KEYS = ["scan", "redact", "undo", "json", "updates", "quit"]
+_ACTION_KEYS = ["scan", "redact", "undo", "json", "updates", "star", "quit"]
 
 
 def action_menu() -> str | None:

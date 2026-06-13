@@ -118,6 +118,7 @@ def run(args, *, _findings_out: list | None = None) -> int:
         ui.stage(3, "ok", "FINDINGS", "no secrets found")
         ui.stage(4, "skip", "REDACT", "nothing to redact")
         ui.stage(5, "skip", "ROTATE", "nothing to rotate")
+        ui.contribute_line()
         return 0
 
     total = sum(len(v) for v in found_by_file.values())
@@ -129,6 +130,7 @@ def run(args, *, _findings_out: list | None = None) -> int:
                  "skipped — run with --fix to redact in place (.bak backups)")
         ui.stage(5, "warn", "ROTATE", "these keys are still live")
         ui.rotation_panel(_rotation_items(found_by_file))
+        ui.contribute_line()
         if _findings_out is not None:
             _findings_out.append((source, found_by_file))
         return 1
