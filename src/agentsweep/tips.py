@@ -14,7 +14,7 @@ TIPS: list[str] = [
     "Seed phrases are validated by BIP-39 checksum, so prose never false-positives",
     "Set AGENTSWEEP_NO_ANIM=1 to disable animations and the live progress bar",
     "Use --root /path/to/copy to scan an offline archive without touching production",
-    "Use alt+v (Claude Code) to paste images from your clipboard into a conversation",
+    "Rotated your keys? agentsweep purge deletes the .bak files holding the plaintext originals",
     "--no-ignore bypasses .agentsweepignore — useful to audit what you've silenced",
     "The audit log at ~/.claude/agentsweep-audit.jsonl records every write with SHA256",
     "agentsweep --source claude-code is the default; omit --source to scan Claude Code",
