@@ -73,6 +73,11 @@ RULES: list[tuple[str, str, re.Pattern]] = [
         # keyword literal anywhere → the prefilter extractor returns () and
         # the rule always runs.
         re.compile(r"\b[MNO][\w-]{23,27}\.[\w-]{6,7}\.[\w-]{27,40}(?![\w-])")),
+    ("discord-webhook", "Discord webhook URL",
+        # discord.com / discordapp.com /api/webhooks/<17-20 digit id>/<token>.
+        # Anchored on the "discord" literal so the prefilter scopes it tightly;
+        # every quantifier is bounded.
+        re.compile(r"\bdiscord(?:app)?\.com/api/webhooks/\d{17,20}/[\w-]{60,80}\b")),
     # --- ported from gitleaks (see scripts/rules_drift.py mapping) ---
     ('1password-secret-key', '1Password secret key',
         re.compile('\\bA3-[A-Z0-9]{6}-(?:(?:[A-Z0-9]{11})|(?:[A-Z0-9]{6}-[A-Z0-9]{5}))-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}\\b')),
@@ -714,6 +719,7 @@ ROTATION_GUIDANCE: dict[str, str] = {
     "sendgrid": "Rotate: https://app.sendgrid.com/settings/api_keys",
     "twilio": "Rotate: https://console.twilio.com/us1/account/keys-credentials/api-keys",
     "discord-bot-token": "Reset: https://discord.com/developers/applications (your app > Bot > Reset Token)",
+    "discord-webhook": "Delete or regenerate the webhook: Server Settings > Integrations > Webhooks (or the channel's Edit Webhook dialog).",
     # --- ported from gitleaks (see scripts/rules_drift.py mapping) ---
     '1password-secret-key': 'Rotate: regenerate the Secret Key in your 1Password account profile (https://support.1password.com/secret-key/)',
     '1password-service-account-token': 'Revoke: https://my.1password.com/developer (Service Accounts > revoke token)',

@@ -273,3 +273,27 @@ def test_discord_keyword_hex_stays_api_token() -> None:
     rules = {f.rule for f in scan_text(hit)}
     assert "discord-api-token" in rules
     assert "discord-bot-token" not in rules
+
+
+# Discord webhook URLs are also native (no gitleaks rule). The token segment is
+# split across literals so this file never holds a contiguous webhook string.
+_WEBHOOK_TOKEN = ("AbCdEfGhIjKlMnOpQrStUvWxYz0123456789"
+                  "AbCdEfGhIjKlMnOpQrStUvWx")  # 60 base64url chars
+
+
+@pytest.mark.parametrize("host", ["discord.com", "discordapp.com"])
+def test_discord_webhook_detected(host: str) -> None:
+    url = f"https://{host}/api/webhooks/" "123456789012345678/" + _WEBHOOK_TOKEN
+    assert any(f.rule == "discord-webhook" for f in scan_text(url)), (
+        f"discord-webhook not reported for {host}"
+    )
+
+
+@pytest.mark.parametrize("text", [
+    # A normal Discord channel link is not a webhook with a token.
+    "see https://discord.com/channels/123456789012345678/987654321098765432",
+    # Webhook path but the token is far too short.
+    "https://discord.com/api/webhooks/123456789012345678/short",
+])
+def test_discord_webhook_no_false_positive(text: str) -> None:
+    assert not any(f.rule == "discord-webhook" for f in scan_text(text))
