@@ -12,6 +12,9 @@ from ._extended import (
     ContinueSource,
     GeminiCliSource,
     GitHubCopilotSource,
+    KiloCodeSource,
+    OpenInterpreterSource,
+    RooCodeSource,
 )
 from ._vscode import CursorSource, WindsurfSource
 
@@ -23,8 +26,11 @@ SOURCES: dict[str, type[Source]] = {
     "windsurf":              WindsurfSource,
     "aider":                 AiderSource,
     "cline":                 ClineSource,
+    "kilo-code":             KiloCodeSource,
+    "roo-code":              RooCodeSource,
     "gemini-cli":            GeminiCliSource,
     "continue-vscode":       ContinueSource,
+    "open-interpreter":      OpenInterpreterSource,
     "github-copilot-chat":   GitHubCopilotSource,
     "openclaw":              OpenClawSource,
     "hermes":                HermesSource,
@@ -43,8 +49,11 @@ __all__ = [
     "WindsurfSource",
     "AiderSource",
     "ClineSource",
+    "KiloCodeSource",
+    "RooCodeSource",
     "GeminiCliSource",
     "ContinueSource",
+    "OpenInterpreterSource",
     "GitHubCopilotSource",
     "OpenClawSource",
     "HermesSource",

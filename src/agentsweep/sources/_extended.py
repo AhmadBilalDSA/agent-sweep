@@ -12,8 +12,11 @@ from ..preflight import (
     CONTINUE_MARKERS,
     GEMINI_CLI_MARKERS,
     GITHUB_COPILOT_MARKERS,
+    KILO_CODE_MARKERS,
+    OPEN_INTERPRETER_MARKERS,
+    ROO_CODE_MARKERS,
 )
-from ._base import JsonlSource, KeyPath, Source, _set_by_path, _walk_json
+from ._base import JsonlSource, KeyPath, Source, _walk_json
 from ._helpers import (
     _apply_json_file_redactions,
     _apply_jsonl_redactions,
@@ -94,6 +97,37 @@ class ClineSource(Source):
 
     def content_format(self, path: Path) -> str:
         return "json"
+
+
+class KiloCodeSource(ClineSource):
+    """Kilo Code (kilocode.kilo-code) — a Cline/Roo fork that stores the
+    identical per-task ``api_conversation_history.json`` layout under its own
+    globalStorage directory. Only the extension dir differs from Cline, so all
+    scan/redact logic is inherited.
+    """
+
+    name = "kilo-code"
+    display_name = "Kilo Code"
+    process_markers = KILO_CODE_MARKERS
+
+    @classmethod
+    def default_root(cls) -> Path:
+        return cls._vscode_user_dir() / "globalStorage" / "kilocode.kilo-code"
+
+
+class RooCodeSource(ClineSource):
+    """Roo Code (RooVeterinaryInc.roo-cline) — a Cline fork with the identical
+    per-task ``api_conversation_history.json`` layout under its own
+    globalStorage directory. Scan/redact logic is inherited from Cline.
+    """
+
+    name = "roo-code"
+    display_name = "Roo Code"
+    process_markers = ROO_CODE_MARKERS
+
+    @classmethod
+    def default_root(cls) -> Path:
+        return cls._vscode_user_dir() / "globalStorage" / "rooveterinaryinc.roo-cline"
 
 
 class GeminiCliSource(JsonlSource):
@@ -226,6 +260,36 @@ class ContinueSource(Source):
 
     def content_format(self, path: Path) -> str:
         return "json"
+
+
+class OpenInterpreterSource(ContinueSource):
+    """Open Interpreter — whole-file JSON conversations under the platform
+    config dir: ``<user_config_dir>/open-interpreter/conversations/*.json``.
+
+    Reuses ContinueSource's whole-file JSON walk and redaction; only the root
+    and the history subdirectory ("conversations" rather than "sessions")
+    differ.
+    """
+
+    name = "open-interpreter"
+    display_name = "Open Interpreter"
+    process_markers = OPEN_INTERPRETER_MARKERS
+
+    @classmethod
+    def default_root(cls) -> Path:
+        if sys.platform == "win32":
+            base = os.environ.get("LOCALAPPDATA", "")
+            if base:
+                return Path(base) / "open-interpreter"
+        elif sys.platform == "darwin":
+            return Path.home() / "Library" / "Application Support" / "open-interpreter"
+        xdg = os.environ.get("XDG_CONFIG_HOME", "")
+        if xdg:
+            return Path(xdg) / "open-interpreter"
+        return Path.home() / ".config" / "open-interpreter"
+
+    def _sessions_dir(self) -> Path:
+        return self.root / "conversations"
 
 
 class GitHubCopilotSource(Source):

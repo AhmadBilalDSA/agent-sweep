@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from pathlib import Path
 
 
 CLAUDE_CODE_MARKERS: tuple[str, ...] = (
@@ -107,6 +106,27 @@ GOOSE_MARKERS: tuple[str, ...] = (
     "goose.exe",
     "goose.cmd",
     " goose ",
+)
+
+KILO_CODE_MARKERS: tuple[str, ...] = (
+    "kilocode.kilo-code",
+    "kilo-code",
+    "/kilocode ",
+    " kilo ",
+)
+
+ROO_CODE_MARKERS: tuple[str, ...] = (
+    "rooveterinaryinc.roo-cline",
+    "roo-cline",
+    "roo-code",
+    "/roo ",
+)
+
+OPEN_INTERPRETER_MARKERS: tuple[str, ...] = (
+    "open-interpreter",
+    "open_interpreter",
+    "/interpreter ",
+    "interpreter.exe",
 )
 
 
