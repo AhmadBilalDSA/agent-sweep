@@ -275,7 +275,7 @@ No. It is fully offline — zero network calls during scanning or redacting. The
 
 Thanks to everyone who has contributed code, bug reports, and ideas.
 
-[![Contributors](https://contrib.rocks/image?repo=Ishannaik/agent-sweep)](https://github.com/Ishannaik/agent-sweep/graphs/contributors)
+[![Contributors](https://contrib.rocks/image?repo=Ishannaik/agent-sweep&max=100)](https://github.com/Ishannaik/agent-sweep/graphs/contributors)
 
 ## License
 
