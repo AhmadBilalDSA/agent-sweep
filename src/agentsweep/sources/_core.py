@@ -61,8 +61,9 @@ class OpenCodeSource(Source):
       else ~/.local/share (xdg-basedir fallback)
 
     If the SQLite DB is present it is the primary source: text content from
-    the ``part`` table (column ``content``) is scanned.  The redaction path
-    updates the DB row in place.  If only the legacy JSON files exist they are
+    the ``part`` / ``message`` / ``session`` tables is scanned (column
+    ``data`` on the current drizzle schema, ``content`` / ``metadata`` on
+    legacy ones).  The redaction path updates the DB row in place.  If only the legacy JSON files exist they are
     scanned as ordinary JSON (not JSONL); each file is parsed as a dict and
     every string value is yielded.
     """
@@ -155,12 +156,14 @@ class OpenCodeSource(Source):
             return
         try:
             for table, col in self._sqlite_text_columns(con):
-                try:
-                    cur = con.execute(
-                        f"SELECT rowid, {col} FROM {table}"  # noqa: S608
-                    )
-                except sqlite3.OperationalError:
-                    continue
+                # No OperationalError swallow here: _sqlite_text_columns has
+                # verified via PRAGMA table_info that every (table, col) pair
+                # exists, so "no such column" cannot legitimately occur — and
+                # silently eating it is exactly what hid the schema drift of
+                # issue #14 (scan reported CLEAN while missing part.data).
+                cur = con.execute(
+                    f"SELECT rowid, {col} FROM {table}"  # noqa: S608
+                )
                 for rowid, value in cur:
                     if not isinstance(value, str) or not value:
                         continue
@@ -174,12 +177,20 @@ class OpenCodeSource(Source):
             con.close()
 
     def _sqlite_text_columns(self, con: sqlite3.Connection) -> list[tuple[str, str]]:
+        """Whitelisted (table, column) pairs that hold user text.
+
+        Candidates cover both the current drizzle schema (``data`` JSON
+        columns) and legacy ones; only columns that actually exist (per
+        ``PRAGMA table_info``) are returned. If a known table exists but
+        NONE of its candidate columns do, opencode changed its schema
+        again — raise loudly rather than scan nothing and report a false
+        all-clear (issue #14).
+        """
         pairs: list[tuple[str, str]] = []
         known = {
-            "part": ["content"],
-            "message": ["metadata", "metadata_part"],
+            "part": ["data", "content"],  # data = current, content = legacy
+            "message": ["data", "metadata", "metadata_part"],
             "session": ["title"],
-            "session_input": ["content"],
         }
         try:
             tables = {
@@ -193,8 +204,19 @@ class OpenCodeSource(Source):
         for table, cols in known.items():
             if table not in tables:
                 continue
-            for col in cols:
-                pairs.append((table, col))
+            actual = {
+                row[1] for row in con.execute(f"PRAGMA table_info({table})")
+            }
+            present = [c for c in cols if c in actual]
+            if not present:
+                raise RuntimeError(
+                    f"OpenCode schema drift: table {table!r} has none of the "
+                    f"expected text columns {cols!r}; opencode's schema "
+                    "changed and this scan would silently miss it. Please "
+                    "file an issue at "
+                    "https://github.com/Ishannaik/agent-sweep/issues"
+                )
+            pairs.extend((table, c) for c in present)
         return pairs
 
 class AiderSource(Source):
