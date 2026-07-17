@@ -12,7 +12,7 @@ license = { text = "MIT" }
 # which Python's re only supports from 3.11.
 requires-python = ">=3.11"
 authors = [{ name = "agentsweep contributors" }]
-keywords = ["security", "secrets", "dlp", "claude-code", "llm", "redaction"]
+keywords = ["security", "secrets", "dlp", "claude-code", "llm", "redaction", "secret-scanning", "credential-scanner", "ai-agents", "cursor", "codex", "gitleaks", "prompt-security"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",

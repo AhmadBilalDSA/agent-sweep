@@ -336,7 +336,33 @@ The patterns: AWS access keys, GitHub tokens (PAT/OAuth/App/fine-grained), Strip
 
 For deeper detection, run `gitleaks` or `trufflehog` alongside agentsweep — their rule packs are more exhaustive. agentsweep's value is the **agent-history-specific surface**, not the detection engine.
 
+## agentsweep vs gitleaks vs trufflehog
+
+They solve different problems, and they compose — agentsweep is not a replacement for a git-repo scanner, it covers the surface those tools were never built for: the local AI-agent history files where pasted keys accumulate.
+
+| | agentsweep | gitleaks | trufflehog |
+|---|---|---|---|
+| **Primary target** | AI agent history (`~/.claude/`, `~/.codex/`, Cursor, 30 agents) | git repos & commits | git repos, filesystems, cloud, CI |
+| **Redacts in place** | ✅ structure-preserving, atomic, reversible (`undo`) | ❌ detection only | ❌ detection only |
+| **Rotation guidance** | ✅ per-provider revocation links | ❌ | ❌ |
+| **Verifies live keys** | ❌ | ❌ | ✅ (network) |
+| **Rules** | 191 (167 ported from gitleaks) | ~150 | 800+ verified |
+| **Runs fully offline** | ✅ zero network calls | ✅ | ⚠️ verification needs network |
+
+**Rule of thumb:** scan your codebase and CI with gitleaks or trufflehog; scan the agent-history surface they don't touch with agentsweep. Run both — they overlap by design and cover each other's blind spots.
+
 ## FAQ
+
+**How do I remove secrets (API keys) from my Claude Code history?**
+Install with `uv tool install agentsweep`, run `asweep`, and the interactive menu scans `~/.claude/projects/`. When it finds secrets it offers to redact them in place (type `REDACT` to confirm) — the values are replaced, the JSONL structure is preserved byte-for-byte, and a `.bak` backup is kept so you can `agentsweep undo`. Same flow works for Codex, Cursor, and 27 other agents via `--source`.
+
+**Is it safe to run on my real agent history?**
+Yes. Scanning is read-only. Redaction is gated behind a typed `REDACT` confirmation, writes atomically (temp file → fsync → `os.replace`), keeps an owner-only `.bak` backup, validates the rewritten file parses before committing, and is fully reversible with `agentsweep undo`. Nine safety invariants guard every write — see [Corruption-prevention guarantees](#corruption-prevention-guarantees).
+
+**Which AI coding agents does it support?**
+30, including Claude Code, OpenAI Codex, Cursor, Windsurf, Aider, Cline, Gemini CLI, GitHub Copilot Chat, Continue, and OpenCode. Run `agentsweep list-sources` to see the full list and which ones have history on your machine.
+
+
 
 **Why does `uvx agentsweep` show an old version?**
 uvx caches tools locally. Use `uvx agentsweep@latest` to always run the newest version (recommended), or force a cache refresh with `uvx --reinstall agentsweep`.
