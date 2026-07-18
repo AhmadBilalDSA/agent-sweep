@@ -14,7 +14,7 @@ on:
       - '.github/ISSUE_TEMPLATE/**'
 
 # A newer push to the same branch/PR cancels the older in-progress run, so
-# rapid pushes don't pile up a queue of full 6-job matrices.
+# rapid pushes don't pile up a queue of full matrices.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -26,7 +26,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # Every platform agentsweep actually runs on: Linux x64 + arm64,
+        # Windows x64, and macOS (Apple Silicon). It is a Python CLI, so there
+        # is no iOS/Android target to test.
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
         python-version: ["3.11", "3.12", "3.13"]
 
     steps:
