@@ -94,24 +94,38 @@ Every write is protected by 8 safety invariants — atomic replace, mandatory `.
 
 ## Install
 
-**Recommended — isolated, no venv conflicts:**
+agentsweep is a command-line tool, so install it in its own isolated environment. Both recommended options handle that for you.
+
+**uv (recommended):**
 ```bash
-uv tool install agentsweep      # one-time install
-uv tool upgrade agentsweep      # update to latest
+uv tool install agentsweep      # install
+uv tool upgrade agentsweep      # update
+uvx agentsweep@latest           # or run once without installing
 ```
 
-**Try without installing (always runs latest):**
+**pipx:**
 ```bash
-uvx agentsweep@latest
+pipx install agentsweep
+pipx upgrade agentsweep
 ```
 
-**Classic pip:**
+**pip** works too, but keep it inside a virtual environment. Modern Linux and macOS block `pip install` into the system Python ([PEP 668](https://peps.python.org/pep-0668/)), and a CLI has no business there anyway:
 ```bash
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install agentsweep
-pip install --upgrade agentsweep
 ```
 
-> Don't have `uv`? `pip install uv` or see [astral.sh/uv](https://docs.astral.sh/uv/). Requires Python 3.11+.
+You do not need conda. It exists for heavy binary and scientific stacks, and agentsweep is pure Python with three small dependencies.
+
+**Android (Termux):**
+```bash
+pkg install python clang
+pip install agentsweep
+```
+The `clang` package lets the one native dependency build against Android's libc.
+
+> No `uv`? `pip install uv` or see [astral.sh/uv](https://docs.astral.sh/uv/). Requires Python 3.11+.
 
 ### Docker
 
