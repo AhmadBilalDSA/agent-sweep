@@ -437,6 +437,18 @@ OpenCode support was added in v0.1.1. Run `pip install --upgrade agentsweep` or 
 **Does agentsweep send my data anywhere?**
 No. It is fully offline — zero network calls during scanning or redacting. The only optional network call is the background update check, which only fetches the latest version number from PyPI.
 
+## Contribution security
+
+agentsweep runs against your most sensitive data, so a malicious contribution would be worth more to an attacker than one to an ordinary tool. Every pull request is reviewed line-by-line for backdoors and supply-chain risk before it merges — not just for correctness. Concretely, a PR is rejected if it:
+
+- **Adds a network call.** agentsweep is offline by design; the only permitted outbound request is the optional PyPI version check. Any new socket / `urllib` / `requests` / webhook call is a hard no.
+- **Introduces obfuscated or dynamic code** — `eval`/`exec`/`compile` on runtime data, `base64`/hex-decoded payloads, dynamic `__import__`, `pickle`/`marshal` of untrusted input.
+- **Weakens a safety invariant** — anything that writes outside `safe_write()`, drops a post-write validation, skips the `.bak` backup, or logs/prints a raw secret value. See [Safety-first review](CONTRIBUTING.md#safety-first-review).
+- **Pulls in an unvetted dependency** or repins an existing one to an unexpected source/version.
+- **Edits CI/workflows to exfiltrate secrets or tokens** (e.g. printing `GITHUB_TOKEN`, adding a step that phones home, or touching the PyPI Trusted-Publisher release path).
+
+Every PR also runs GitGuardian in CI, and workflows from first-time contributors require maintainer approval before they execute. Maintainers merge only after this review — a green checkmark alone is never sufficient.
+
 ## Contributors
 
 Thanks to everyone who has contributed code, bug reports, and ideas.
