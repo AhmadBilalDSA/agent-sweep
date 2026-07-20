@@ -43,9 +43,12 @@ def test_no_catastrophic_scan_time(name):
 @pytest.mark.parametrize("name", list(CURL_AUTH_BOMBS))
 def test_curl_auth_rules_resist_adversarial_backtracking(name):
     t0 = time.perf_counter()
-    scan_text(CURL_AUTH_BOMBS[name])
+    findings = scan_text(CURL_AUTH_BOMBS[name])
     elapsed = time.perf_counter() - t0
 
+    assert not any(f.rule == name for f in findings), (
+        f"{name} produced a false-positive finding"
+    )
     assert elapsed < 1.0, f"{name} adversarial scan too slow: {elapsed:.3f}s"
 
 
