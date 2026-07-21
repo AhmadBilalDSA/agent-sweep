@@ -19,33 +19,33 @@
 
 [Watch the 25-second demo](https://github.com/Ishannaik/agent-sweep/raw/main/docs/agentsweep-demo.mp4)
 
-> **Prevention:** Don't paste API keys into cloud-backed AI agents at all — the key transits the provider's servers before it ever hits your disk.
+> **Prevention:** Don't paste API keys into cloud-backed AI agents at all. The key transits the provider's servers before it ever hits your disk.
 >
-> **If you already did:** agentsweep removes the remaining local attack vector — supply-chain malware and compromised packages that scan your disk for credentials. Your files never leave your machine.
+> **If you already did:** agentsweep removes the remaining local attack vector: supply-chain malware and compromised packages that scan your disk for credentials. Your files never leave your machine.
 
 ---
 
 **31 agents supported:** Claude Code · Codex · OpenCode · Cursor · Windsurf · Aider · Cline · Kilo Code · Roo Code · PearAI · Trae · Void · Gemini CLI · Qwen Code · Continue · Open Interpreter · GitHub Copilot Chat · OpenClaw · Hermes · Goose · llm (Datasette) · Warp · Crush · Grok CLI · Kiro CLI · Zed · Codebuff · Plandex · Junie · Mentat · JetBrains AI
 
-> **Experimental sources** (Warp, Crush, Grok CLI, Kiro CLI, Zed, Codebuff, Plandex, Qwen Code, PearAI, Trae, Void, Junie, Mentat, JetBrains AI) have storage paths/formats derived from research but **not yet verified against a real install**. Scanning is safe — a wrong path simply finds nothing — but they may under-report until confirmed. They're tagged `(experimental)` in the picker and print a notice on scan.
+> **Experimental sources** (Warp, Crush, Grok CLI, Kiro CLI, Zed, Codebuff, Plandex, Qwen Code, PearAI, Trae, Void, Junie, Mentat, JetBrains AI) have storage paths/formats derived from research but **not yet verified against a real install**. Scanning is safe: a wrong path finds nothing. They may under-report until confirmed. They're tagged `(experimental)` in the picker and print a notice on scan.
 
-**193 detection rules** — AWS, GitHub, Stripe, OpenAI, Anthropic, Google, Slack, Discord, HuggingFace, JWT, PEM keys, DB URLs, BIP-39 seed phrases, and [many more](#whats-detected)
+**193 detection rules:** AWS, GitHub, Stripe, OpenAI, Anthropic, Google, Slack, Discord, HuggingFace, JWT, PEM keys, DB URLs, BIP-39 seed phrases, and [many more](#whats-detected)
 
-**Alpha** — every destructive step is gated, backed up, and reversible with one command
+**Alpha:** every destructive step is gated, backed up, and reversible with one command
 
 </div>
 
 ## The problem
 
-Claude Code (and every other AI coding CLI) stores your full conversation history as plain-text JSONL on disk — under `~/.claude/projects/` for Claude Code, `~/.codex/sessions/` for OpenAI Codex. Anything you paste — an AWS key, a `.env` file, a database URL — sits in clear text indefinitely. A typical dev's history accumulates dozens of secrets over months, often without them realizing.
+Claude Code (and every other AI coding CLI) stores your full conversation history as plain-text JSONL on disk, under `~/.claude/projects/` for Claude Code and `~/.codex/sessions/` for OpenAI Codex. Anything you paste, whether an AWS key, a `.env` file, or a database URL, sits in clear text indefinitely. A typical dev's history accumulates dozens of secrets over months, usually unnoticed.
 
 `agentsweep` scans that history, tells you what leaked, and can redact the secret values in place while preserving the JSONL structure byte-for-byte. It also tells you which keys to rotate, with the right revocation URL for each provider.
 
-> **Scope of protection:** agentsweep itself is fully local and offline — it reads and writes only files on your machine and makes zero network calls. It removes one attack vector: secrets sitting in local history files. It does not affect what your AI provider already received: when you paste a key into Claude Code, Cursor, or any cloud-backed agent, that key already transited the provider's servers before it hit disk. If that concerns you, consider a locally-hosted model (Ollama, LM Studio, OpenCode) where nothing leaves your machine at all — agentsweep pairs especially well with local-model setups.
+> **Scope of protection:** agentsweep is fully local and offline. It reads and writes only files on your machine and makes zero network calls. It removes one attack vector: secrets sitting in local history files. It does not affect what your AI provider already received. When you paste a key into Claude Code, Cursor, or any cloud-backed agent, that key already transited the provider's servers before it hit disk. If that concerns you, consider a locally-hosted model (Ollama, LM Studio, OpenCode) where nothing leaves your machine, which pairs well with agentsweep.
 
 ## Why this matters right now
 
-Supply chain attacks are accelerating. In 2024–2025 a wave of malicious npm and PyPI packages — `sha256-universal`, `shailulid`, hundreds of typosquats — were caught doing one thing: **exfiltrating developer credentials off the machine that installed them**. They target environment variables, `.env` files, shell history, SSH keys, and now AI agent history files.
+Supply chain attacks are accelerating. In 2024 and 2025, a wave of malicious npm and PyPI packages (`sha256-universal`, `shailulid`, hundreds of typosquats) were caught **exfiltrating developer credentials off the machine that installed them**. They target environment variables, `.env` files, shell history, SSH keys, and now AI agent history files.
 
 AI coding assistants have created a new category of credential exposure that didn't exist two years ago:
 
@@ -54,7 +54,7 @@ AI coding assistants have created a new category of credential exposure that did
 - You rotate the key you used in public but forget the dozen others in your history
 - Meanwhile your history grows: every `.env` you asked an AI to help with, every DB URL you shared for debugging, every token you pasted for a one-liner
 
-**AI agent history is the new `.bash_history` — except it contains full context, not just commands.** The attack tooling already knows this. `agentsweep` exists to clean up before it's exploited.
+AI agent history holds full context, not just the commands a shell history keeps. Attackers already scan for it. `agentsweep` cleans it up before that happens.
 
 ## Quick start
 
@@ -64,7 +64,7 @@ uv tool install agentsweep      # install — adds `agentsweep` and `asweep` to 
 asweep                          # run — interactive menu guides you through everything
 ```
 
-That's it. No virtualenv to activate, no PATH fiddling — `uv tool install` gives the command its own isolated environment.
+No virtualenv to activate and no PATH fiddling. `uv tool install` gives the command its own isolated environment.
 
 ## How it works
 
@@ -90,11 +90,11 @@ flowchart LR
     style H fill:#2d1e4a,color:#fff,stroke:#5a3a8b
 ```
 
-Every write is protected by 8 safety invariants — atomic replace, mandatory `.bak` backup, symlink rejection, mtime/process gates, and post-write JSONL validation. `agentsweep undo` restores from backups.
+Eight safety invariants protect every write: atomic replace, mandatory `.bak` backup, symlink rejection, mtime and process gates, and post-write JSONL validation. `agentsweep undo` restores from backups.
 
 ## Install
 
-agentsweep is a command-line tool, so install it in its own isolated environment. Both recommended options handle that for you.
+agentsweep is a command-line tool, so install it in its own isolated environment. Both recommended options set that up.
 
 **uv (recommended):**
 ```bash
@@ -205,26 +205,26 @@ If your profile blocks script execution, allow local scripts first with
 
 ### Interactive mode
 
-Run with no arguments in a terminal and you get the full experience — banner,
-numbered menu, typed confirmations before anything destructive, and one-key
-undo (restores the `.bak` backups). Any interactive scan that finds secrets
-ends with an offer to redact them on the spot (type `REDACT` to confirm):
+Run with no arguments in a terminal and you get the banner, a numbered menu,
+typed confirmations before anything destructive, and one-key undo (restores the
+`.bak` backups). Any interactive scan that finds secrets ends with an offer to
+redact them on the spot (type `REDACT` to confirm):
 
 ```
 agentsweep
 ```
 
 Scripting is unaffected: any flag, or a piped/redirected stream, skips the
-menu entirely and behaves exactly as documented below.
+menu and behaves as documented below.
 
 ### Verbs
 
 | Command | What it does |
 |---|---|
-| `agentsweep scan` | Scan only — read-only, no files are modified (default when no verb given) |
+| `agentsweep scan` | Scan only: read-only, no files are modified (default when no verb given) |
 | `agentsweep fix` | Scan, then offer to redact findings in place (type `REDACT` to confirm) |
 | `agentsweep undo` | Restore all `.bak` backups, reverting any previous redaction |
-| `agentsweep purge` | Delete all `.bak` backups once the leaked keys are rotated (permanent — `undo` stops working) |
+| `agentsweep purge` | Delete all `.bak` backups once the leaked keys are rotated (permanent, `undo` stops working) |
 | `agentsweep list-sources` | List every supported agent and show which ones have history on this machine (read-only) |
 | `agentsweep --version` / `-V` | Print the installed version |
 | `agentsweep --update` | Check PyPI for a newer release |
@@ -253,14 +253,14 @@ agentsweep scan --source goose                # Goose ~/.local/share/goose/
 agentsweep scan --source llm                   # Datasette llm CLI logs.db (io.datasette.llm/)
 ```
 
-Running Claude Code under a custom profile? Set `CLAUDE_CONFIG_DIR` (the same variable Claude Code honors) and agentsweep scans that profile's `projects/` instead of `~/.claude`. Several profiles at once — e.g. a personal side-project profile alongside your work one — go in a comma-separated list, and all are scanned:
+Running Claude Code under a custom profile? Set `CLAUDE_CONFIG_DIR` (the same variable Claude Code honors) and agentsweep scans that profile's `projects/` instead of `~/.claude`. To scan several profiles at once, for example a personal side-project profile alongside your work one, list them comma-separated and agentsweep scans all of them:
 
 ```bash
 CLAUDE_CONFIG_DIR=~/.claude,~/.claude-personal agentsweep scan --source claude-code
 ```
 
 Not sure which agents you have installed? `list-sources` prints every supported
-source, its history location, and whether that history exists on this machine —
+source, its history location, and whether that history exists on this machine,
 so you know which `--source` values are worth scanning. It reads nothing and
 writes nothing.
 
@@ -310,7 +310,7 @@ NO_COLOR=1 agentsweep scan
 
 #### SARIF in CI
 
-`--format sarif` emits [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html), so findings show up as code-scanning annotations instead of something you have to parse. Rotation guidance rides along in each rule's `help` text, and only the masked preview is included — the secret itself is never written to the report.
+`--format sarif` emits [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html), so findings show up as code-scanning annotations instead of something you have to parse. Rotation guidance rides along in each rule's `help` text, and only the masked preview is included. The secret itself is never written to the report.
 
 ```yaml
 - name: Scan agent history for secrets
@@ -321,7 +321,7 @@ NO_COLOR=1 agentsweep scan
     sarif_file: agentsweep.sarif
 ```
 
-`|| true` keeps the upload step reachable — `scan` exits 1 when it finds something, which is what you want the SARIF to report rather than a failed step.
+`|| true` keeps the upload step reachable. `scan` exits 1 when it finds something, and you want the SARIF to report that rather than the step failing.
 
 ### Use with pre-commit
 
@@ -335,7 +335,7 @@ repos:
       - id: agentsweep
 ```
 
-Then `pre-commit install`. The hook runs `agentsweep scan --all --detected` on every commit and blocks it (exit 1) if any detected agent history contains a secret. It scans your **history roots** (`~/.claude`, `~/.codex`, ...), not the repo's staged files, so it runs once per commit regardless of what changed — a checkpoint, not a diff scanner. With no agent history on the machine it exits 0 and stays out of the way.
+Then `pre-commit install`. The hook runs `agentsweep scan --all --detected` on every commit and blocks it (exit 1) if any detected agent history contains a secret. It scans your **history roots** (`~/.claude`, `~/.codex`, ...) rather than the repo's staged files, so it runs once per commit no matter what changed. It works as a per-commit checkpoint. With no agent history on the machine it exits 0 and does nothing.
 
 ### Fix-only flags
 
@@ -365,11 +365,11 @@ agentsweep undo --root ~/history-copy
 
 ## Corruption-prevention guarantees
 
-A redactor that corrupts your history is strictly worse than the leak it's fixing. agentsweep enforces these invariants on every `--fix`:
+A redactor that corrupts your history leaves you worse off than the leak it's fixing. agentsweep enforces these invariants on every `--fix`:
 
 1. **Redaction happens in parsed JSON, not on raw bytes.** Secrets are replaced as string *values* inside the parsed structure, then re-serialized. Structural damage is impossible by construction.
-2. **Atomic writes.** Every rewrite goes: temp file → `fsync()` → `os.replace()` over the original. A crash at any instant leaves either the complete old file or the complete new file — never a torn write.
-3. **Post-write validation.** Before committing, the new content must pass a format-aware check: JSONL — every non-empty line parses as JSON and the line count matches the original; whole-file JSON — the document parses; markdown/plaintext — the line count matches the original; SQLite — the rewritten copy passes `PRAGMA integrity_check`. If the check fails, the write aborts and the original is untouched.
+2. **Atomic writes.** Every rewrite goes: temp file → `fsync()` → `os.replace()` over the original. A crash at any instant leaves either the complete old file or the complete new file, never a torn write.
+3. **Post-write validation.** Before committing, the new content must pass a format-aware check. JSONL: every non-empty line parses as JSON and the line count matches the original. Whole-file JSON: the document parses. Markdown/plaintext: the line count matches the original. SQLite: the rewritten copy passes `PRAGMA integrity_check`. If the check fails, the write aborts and the original is untouched.
 4. **`.bak` backup by default.** Created owner-readable only (mode `0600`) since it holds the pre-redaction secrets; refuses to run if a `.bak` already exists (so prior backups can't be clobbered).
 5. **Path containment.** Refuses any target that doesn't resolve inside one of the source's history trees (e.g. Windsurf's User dir and its `~/.codeium/windsurf/memories/`).
 6. **Symlink rejection.** Refuses symlinks outright.
@@ -394,7 +394,7 @@ If you need to restore a single file manually (e.g. you deleted the undo command
 mv session.jsonl.bak session.jsonl
 ```
 
-The backups hold the **pre-redaction originals — plaintext secrets**, so a sweep isn't finished until the leaked keys are rotated and the backups are gone. Once you've rotated:
+The backups hold the **pre-redaction originals, plaintext secrets and all**, so a sweep isn't finished until the leaked keys are rotated and the backups are gone. Once you've rotated:
 
 ```bash
 agentsweep purge                       # delete Claude Code backups (asks first)
@@ -404,23 +404,23 @@ agentsweep purge --yes                 # non-interactive (scripts / CI)
 
 ## What's detected
 
-193 high-confidence patterns **plus a checksum-validated crypto seed-phrase detector** — BIP-39 mnemonics (12/15/18/21/24 words; the wallet format behind BTC, ETH, SOL, BNB, ADA, DOGE, LTC, DOT, AVAX and virtually every major chain) and Electrum seeds are confirmed cryptographically (BIP-39 checksum / Electrum version tag), so English prose that happens to use wallet words never false-positives.
+193 high-confidence patterns, **plus a checksum-validated crypto seed-phrase detector**. It confirms BIP-39 mnemonics (12/15/18/21/24 words, the wallet format behind BTC, ETH, SOL, BNB, ADA, DOGE, LTC, DOT, AVAX and most major chains) and Electrum seeds cryptographically (BIP-39 checksum or Electrum version tag), so English prose that happens to use wallet words won't trigger a false positive.
 
-The patterns: AWS access keys, GitHub tokens (PAT/OAuth/App/fine-grained), Stripe live/test, OpenAI, Anthropic, Google API, Slack bot/user/webhook, Hugging Face, JWT, PEM private keys, DB URLs with embedded passwords, npm/PyPI/SendGrid/Twilio tokens — plus 167 rules ported from the [gitleaks](https://github.com/gitleaks/gitleaks) pack covering GitLab, Grafana, HashiCorp Vault/Terraform, DigitalOcean, Shopify, PlanetScale, Databricks, Atlassian, Azure AD, 1Password, Sentry, New Relic, Mailgun, Datadog, Twilio, Twitter/X, Twitch, Yandex, JFrog, Snyk, Mailchimp, curl credentials on the command line, and many more. Patterns are high-precision — false positives are rare, and provider-context rules are keyword-gated so large pastes stay fast.
+The patterns: AWS access keys, GitHub tokens (PAT/OAuth/App/fine-grained), Stripe live/test, OpenAI, Anthropic, Google API, Slack bot/user/webhook, Hugging Face, JWT, PEM private keys, DB URLs with embedded passwords, and npm/PyPI/SendGrid/Twilio tokens. On top of those sit 167 rules ported from the [gitleaks](https://github.com/gitleaks/gitleaks) pack covering GitLab, Grafana, HashiCorp Vault/Terraform, DigitalOcean, Shopify, PlanetScale, Databricks, Atlassian, Azure AD, 1Password, Sentry, New Relic, Mailgun, Datadog, Twilio, Twitter/X, Twitch, Yandex, JFrog, Snyk, Mailchimp, curl credentials on the command line, and many more. The patterns run high-precision: false positives are rare, and provider-context rules are keyword-gated so large pastes stay fast.
 
 ## What's NOT detected
 
 - Custom/proprietary secrets without a recognizable prefix.
-- Monero seed phrases (25 words from Monero's own wordlist — planned).
+- Monero seed phrases (25 words from Monero's own wordlist; planned).
 - Unknown tokens that look like arbitrary base64.
 - Secrets split across multiple messages.
 - Anything inside a binary/non-UTF-8 file.
 
-For deeper detection, run `gitleaks` or `trufflehog` alongside agentsweep — their rule packs are more exhaustive. agentsweep's value is the **agent-history-specific surface**, not the detection engine.
+For deeper detection, run `gitleaks` or `trufflehog` alongside agentsweep, since their rule packs are more exhaustive. agentsweep earns its keep by covering the **agent-history-specific surface** those tools skip.
 
 ## agentsweep vs gitleaks vs trufflehog
 
-They solve different problems, and they compose — agentsweep is not a replacement for a git-repo scanner, it covers the surface those tools were never built for: the local AI-agent history files where pasted keys accumulate.
+They solve different problems and compose well together. agentsweep covers the surface a git-repo scanner was never built for: the local AI-agent history files where pasted keys accumulate.
 
 | | agentsweep | gitleaks | trufflehog |
 |---|---|---|---|
@@ -431,15 +431,15 @@ They solve different problems, and they compose — agentsweep is not a replacem
 | **Rules** | 193 (167 ported from gitleaks) | ~150 | 800+ verified |
 | **Runs fully offline** | ✅ zero network calls | ✅ | ⚠️ verification needs network |
 
-**Rule of thumb:** scan your codebase and CI with gitleaks or trufflehog; scan the agent-history surface they don't touch with agentsweep. Run both — they overlap by design and cover each other's blind spots.
+Scan your codebase and CI with gitleaks or trufflehog, then scan the agent-history surface they don't touch with agentsweep. Running both is the intent: they overlap and cover each other's blind spots.
 
 ## FAQ
 
 **How do I remove secrets (API keys) from my Claude Code history?**
-Install with `uv tool install agentsweep`, run `asweep`, and the interactive menu scans `~/.claude/projects/`. When it finds secrets it offers to redact them in place (type `REDACT` to confirm) — the values are replaced, the JSONL structure is preserved byte-for-byte, and a `.bak` backup is kept so you can `agentsweep undo`. Same flow works for Codex, Cursor, and 27 other agents via `--source`.
+Install with `uv tool install agentsweep`, run `asweep`, and the interactive menu scans `~/.claude/projects/`. When it finds secrets it offers to redact them in place (type `REDACT` to confirm). It replaces the values, preserves the JSONL structure byte-for-byte, and keeps a `.bak` backup so you can `agentsweep undo`. The same flow works for Codex, Cursor, and 27 other agents via `--source`.
 
 **Is it safe to run on my real agent history?**
-Yes. Scanning is read-only. Redaction is gated behind a typed `REDACT` confirmation, writes atomically (temp file → fsync → `os.replace`), keeps an owner-only `.bak` backup, validates the rewritten file parses before committing, and is fully reversible with `agentsweep undo`. Nine safety invariants guard every write — see [Corruption-prevention guarantees](#corruption-prevention-guarantees).
+Yes. Scanning is read-only. Redaction is gated behind a typed `REDACT` confirmation, writes atomically (temp file → fsync → `os.replace`), keeps an owner-only `.bak` backup, validates the rewritten file parses before committing, and is fully reversible with `agentsweep undo`. Nine safety invariants guard every write. See [Corruption-prevention guarantees](#corruption-prevention-guarantees).
 
 **Which AI coding agents does it support?**
 30, including Claude Code, OpenAI Codex, Cursor, Windsurf, Aider, Cline, Gemini CLI, GitHub Copilot Chat, Continue, and OpenCode. Run `agentsweep list-sources` to see the full list and which ones have history on your machine.
@@ -453,19 +453,19 @@ uvx caches tools locally. Use `uvx agentsweep@latest` to always run the newest v
 OpenCode support was added in v0.1.1. Run `pip install --upgrade agentsweep` or `uvx agentsweep@latest` to get it.
 
 **Does agentsweep send my data anywhere?**
-No. It is fully offline — zero network calls during scanning or redacting. The only optional network call is the background update check, which only fetches the latest version number from PyPI.
+No. It is fully offline, with zero network calls during scanning or redacting. The only optional network call is the background update check, which fetches the latest version number from PyPI.
 
 ## Contribution security
 
-agentsweep runs against your most sensitive data, so a malicious contribution would be worth more to an attacker than one to an ordinary tool. Every pull request is reviewed line-by-line for backdoors and supply-chain risk before it merges — not just for correctness. Concretely, a PR is rejected if it:
+agentsweep runs against your most sensitive data, so a malicious contribution would be worth more to an attacker than one to an ordinary tool. Every pull request gets a line-by-line review for backdoors and supply-chain risk before it merges, on top of the usual correctness check. A PR is rejected if it:
 
-- **Adds a network call.** agentsweep is offline by design; the only permitted outbound request is the optional PyPI version check. Any new socket / `urllib` / `requests` / webhook call is a hard no.
-- **Introduces obfuscated or dynamic code** — `eval`/`exec`/`compile` on runtime data, `base64`/hex-decoded payloads, dynamic `__import__`, `pickle`/`marshal` of untrusted input.
-- **Weakens a safety invariant** — anything that writes outside `safe_write()`, drops a post-write validation, skips the `.bak` backup, or logs/prints a raw secret value. See [Safety-first review](CONTRIBUTING.md#safety-first-review).
+- **Adds a network call.** agentsweep is offline by design, and the only permitted outbound request is the optional PyPI version check. Any new socket / `urllib` / `requests` / webhook call is a hard no.
+- **Introduces obfuscated or dynamic code**: `eval`/`exec`/`compile` on runtime data, `base64`/hex-decoded payloads, dynamic `__import__`, `pickle`/`marshal` of untrusted input.
+- **Weakens a safety invariant**: anything that writes outside `safe_write()`, drops a post-write validation, skips the `.bak` backup, or logs/prints a raw secret value. See [Safety-first review](CONTRIBUTING.md#safety-first-review).
 - **Pulls in an unvetted dependency** or repins an existing one to an unexpected source/version.
 - **Edits CI/workflows to exfiltrate secrets or tokens** (e.g. printing `GITHUB_TOKEN`, adding a step that phones home, or touching the PyPI Trusted-Publisher release path).
 
-Every PR also runs GitGuardian and a [bandit](https://bandit.readthedocs.io/) SAST scan in CI (see [Security linting](CONTRIBUTING.md#security-linting)), and workflows from first-time contributors require maintainer approval before they execute. Maintainers merge only after this review — a green checkmark alone is never sufficient.
+Every PR also runs GitGuardian and a [bandit](https://bandit.readthedocs.io/) SAST scan in CI (see [Security linting](CONTRIBUTING.md#security-linting)), and workflows from first-time contributors require maintainer approval before they execute. Maintainers merge only after this review. A green checkmark on its own is never enough.
 
 ## Contributors
 
