@@ -408,6 +408,34 @@ agentsweep purge --yes                 # non-interactive (scripts / CI)
 
 The patterns: AWS access keys, GitHub tokens (PAT/OAuth/App/fine-grained), Stripe live/test, OpenAI, Anthropic, Google API, Slack bot/user/webhook, Hugging Face, JWT, PEM private keys, DB URLs with embedded passwords, npm/PyPI/SendGrid/Twilio tokens — plus 167 rules ported from the [gitleaks](https://github.com/gitleaks/gitleaks) pack covering GitLab, Grafana, HashiCorp Vault/Terraform, DigitalOcean, Shopify, PlanetScale, Databricks, Atlassian, Azure AD, 1Password, Sentry, New Relic, Mailgun, Datadog, Twilio, Twitter/X, Twitch, Yandex, JFrog, Snyk, Mailchimp, curl credentials on the command line, and many more. Patterns are high-precision — false positives are rare, and provider-context rules are keyword-gated so large pastes stay fast.
 
+## `.agentsweepignore` — suppress false positives
+
+A false positive you already understand should not keep showing up. Put an
+`.agentsweepignore` file in the **scan root** or your **current working
+directory** (both are read; entries merge). Each non-comment line is one of
+three forms:
+
+| Form | What it suppresses |
+| --- | --- |
+| `rule:<rule-id>` | Every finding from that rule |
+| `<relpath>:<line>:<rule>` | One exact finding — the fingerprint agentsweep prints next to each hit |
+| a bare literal | Any finding whose secret value matches |
+
+Example:
+
+```
+# never flag the demo AWS key
+AKIAIOSFODNN7EXAMPLE
+# ignore the whole slack-webhook rule
+rule:slack-webhook
+# one exact false positive in a fixture
+tests/fixtures/claude/sample.jsonl:42:aws-access-key-id
+```
+
+Copy-paste path: run a scan, copy the fingerprint printed beside the false
+positive, paste it into `.agentsweepignore`, re-scan — it will be gone. Use
+`--no-ignore` to bypass both files when you want a completely fresh pass.
+
 ## What's NOT detected
 
 - Custom/proprietary secrets without a recognizable prefix.
