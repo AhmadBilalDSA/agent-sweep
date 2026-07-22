@@ -15,9 +15,9 @@
 [![GitHub Stars](https://img.shields.io/github/stars/Ishannaik/agent-sweep)](https://github.com/Ishannaik/agent-sweep/stargazers)
 [![Visitors](https://visitor-badge.laobi.icu/badge?page_id=Ishannaik.agent-sweep)](https://github.com/Ishannaik/agent-sweep)
 
-<video src="https://github.com/Ishannaik/agent-sweep/raw/main/docs/agentsweep-demo.mp4" poster="docs/agentsweep-demo-poster.png" controls muted width="480"></video>
+[![AgentSweep demo, scanning and redacting secrets in AI agent history](docs/agentsweep-demo.gif)](https://github.com/Ishannaik/agent-sweep/raw/main/docs/agentsweep-demo.mp4)
 
-[Watch the 25-second demo](https://github.com/Ishannaik/agent-sweep/raw/main/docs/agentsweep-demo.mp4)
+[Watch the full clip with sound](https://github.com/Ishannaik/agent-sweep/raw/main/docs/agentsweep-demo.mp4)
 
 > **Prevention:** Don't paste API keys into cloud-backed AI agents at all — the key transits the provider's servers before it ever hits your disk.
 >
