@@ -160,9 +160,6 @@ def main(argv: list[str] | None = None) -> int:
 
         return list_sources(_parse_list_sources(argv[1:]))
 
-    if argv and argv[0] == "explain":
-        return _run_explain(argv[1:])
-
     if argv and argv[0] == "completion":
         return _run_completion(argv[1:])
 
@@ -180,6 +177,13 @@ def main(argv: list[str] | None = None) -> int:
         argcomplete.autocomplete(completion_parser)
     except ImportError:
         pass
+
+    # Dispatched here (after completion setup), not alongside -V/--update/
+    # list-sources above: explain is a normal, occasionally-invoked verb, not
+    # a hot path like --version, so it can afford this setup cost — and doing
+    # so is what lets rule_id_completer actually fire for shell completion.
+    if argv and argv[0] == "explain":
+        return _run_explain(argv[1:])
 
     if not argv and _interactive():
         from .menu import run_menu
