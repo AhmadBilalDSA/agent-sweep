@@ -1,4 +1,4 @@
-"""explain: read-only lookup into scanner.RULES / ROTATION_GUIDANCE.
+"""agentsweep explain: read-only lookup into scanner.RULES / ROTATION_GUIDANCE.
 
 Covers a known regex-backed rule id, a known function-based detector id
 (bip39-mnemonic, present in scanner.DETECTOR_IDS but not scanner.RULES),
@@ -32,7 +32,8 @@ def test_explain_known_rule_prints_display_pattern_and_guidance(capsys):
 
 
 def test_explain_matches_every_registered_rule(capsys):
-    """Every RULES entry resolves cleanly, not just one hand-picked id."""
+    """Every RULES entry resolves cleanly, with its own guidance, not just
+    one hand-picked id."""
     for rule_id, display, pattern in RULES:
         code = main(["explain", rule_id])
         out = capsys.readouterr().out
@@ -40,6 +41,7 @@ def test_explain_matches_every_registered_rule(capsys):
         assert code == 0, f"{rule_id} should exit 0"
         assert display in out
         assert pattern.pattern in out
+        assert ROTATION_GUIDANCE[rule_id] in out
 
 
 def test_explain_detector_id_resolves_without_a_pattern(capsys):
@@ -52,6 +54,7 @@ def test_explain_detector_id_resolves_without_a_pattern(capsys):
 
     assert code == 0
     assert "bip39-mnemonic" in out
+    assert "function-based detector" in out
     assert ROTATION_GUIDANCE["bip39-mnemonic"] in out
 
 
@@ -69,8 +72,15 @@ def test_explain_list_prints_every_id_once(capsys):
 
 
 def test_explain_list_wins_over_an_extraneous_rule_id(capsys):
-    """--list takes precedence even if a rule_id is also passed."""
-    assert main(["explain", "aws-access-key", "--list"]) == 0
+    """--list takes precedence even if a rule_id is also passed: assert the
+    actual list output appears, not just a zero exit code."""
+    code = main(["explain", "aws-access-key", "--list"])
+    out = capsys.readouterr().out
+    lines = [line for line in out.splitlines() if line]
+    expected = sorted({rid for rid, _d, _p in RULES} | set(DETECTOR_IDS))
+
+    assert code == 0
+    assert lines == expected
 
 
 def test_explain_unknown_rule_id_exits_2(capsys):
@@ -91,17 +101,22 @@ def test_explain_with_no_args_exits_2(capsys):
     assert "rule_id is required" in err
 
 
-def test_explain_rejects_source_flag(capsys):
+def test_explain_rejects_source_and_root_flags(capsys):
     """Read-only: explain takes no --source/--root, unlike the scan verbs."""
     with pytest.raises(SystemExit) as exc_info:
         main(["explain", "aws-access-key", "--source", "codex"])
     assert exc_info.value.code == 2
 
+    with pytest.raises(SystemExit) as exc_info:
+        main(["explain", "aws-access-key", "--root", "/tmp"])
+    assert exc_info.value.code == 2
+
 
 def test_explain_does_not_scan(capsys):
     """No FINDINGS/pipeline banner should ever appear — pure dict lookup."""
-    main(["explain", "--list"])
+    code = main(["explain", "--list"])
     out = capsys.readouterr().out
 
+    assert code == 0
     assert "FINDINGS" not in out
     assert "SECRET (masked)" not in out
