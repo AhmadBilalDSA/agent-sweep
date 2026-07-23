@@ -647,7 +647,7 @@ def _get_completion_parser() -> argparse.ArgumentParser:
     explain_rule_id = explain_p.add_argument(
         "rule_id", nargs="?", help="Rule id to explain (see --list)."
     )
-    setattr(explain_rule_id, "completer", rule_id_completer)
+    explain_rule_id.completer = rule_id_completer
     explain_p.add_argument(
         "--list", action="store_true", help="Print every known rule id."
     )
