@@ -41,7 +41,10 @@ def test_explain_matches_every_registered_rule(capsys):
         assert code == 0, f"{rule_id} should exit 0"
         assert display in out
         assert pattern.pattern in out
-        assert ROTATION_GUIDANCE[rule_id] in out
+
+        guidance = ROTATION_GUIDANCE.get(rule_id)
+        assert guidance is not None, f"{rule_id} is missing rotation guidance"
+        assert guidance in out
 
 
 def test_explain_detector_id_resolves_without_a_pattern(capsys):
@@ -55,6 +58,7 @@ def test_explain_detector_id_resolves_without_a_pattern(capsys):
     assert code == 0
     assert "bip39-mnemonic" in out
     assert "function-based detector" in out
+    assert "no static regex pattern" in out
     assert ROTATION_GUIDANCE["bip39-mnemonic"] in out
 
 
