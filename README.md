@@ -29,7 +29,7 @@
 
 > **Experimental sources** (Warp, Crush, Grok CLI, Kiro CLI, Zed, Codebuff, Plandex, Qwen Code, PearAI, Trae, Void, Junie, Mentat, JetBrains AI) have storage paths/formats derived from research but **not yet verified against a real install**. Scanning is safe: a wrong path finds nothing. They may under-report until confirmed. They're tagged `(experimental)` in the picker and print a notice on scan.
 
-**193 detection rules:** AWS, GitHub, Stripe, OpenAI, Anthropic, Google, Slack, Discord, HuggingFace, JWT, PEM keys, DB URLs, BIP-39 seed phrases, and [many more](#whats-detected)
+**201 detection rules:** AWS, GitHub, Stripe, OpenAI, Anthropic, Google, Slack, Discord, HuggingFace, JWT, PEM keys, DB URLs, BIP-39 seed phrases, and [many more](#whats-detected)
 
 **Alpha:** every destructive step is gated, backed up, and reversible with one command
 
@@ -226,6 +226,7 @@ menu and behaves as documented below.
 | `agentsweep undo` | Restore all `.bak` backups, reverting any previous redaction |
 | `agentsweep purge` | Delete all `.bak` backups once the leaked keys are rotated (permanent, `undo` stops working) |
 | `agentsweep list-sources` | List every supported agent and show which ones have history on this machine (read-only) |
+| `agentsweep explain <rule-id>` | Print one detection rule's pattern and its rotation guidance (read-only) |
 | `agentsweep --version` / `-V` | Print the installed version |
 | `agentsweep --update` | Check PyPI for a newer release |
 
@@ -265,9 +266,17 @@ so you know which `--source` values are worth scanning. It reads nothing and
 writes nothing.
 
 ```bash
-agentsweep list-sources             # all 29 sources + which are on disk
+agentsweep list-sources             # all 31 sources + which are on disk
 agentsweep list-sources --detected  # only the ones found on this machine
 agentsweep list-sources --json      # machine-readable (for scripts/CI)
+```
+
+Wondering why a finding fired, or how to revoke the key it caught? `explain`
+prints a rule's pattern and its rotation guidance without scanning anything:
+
+```bash
+agentsweep explain stripe-live      # pattern + where to roll the key
+agentsweep explain --list           # every rule id, one per line
 ```
 
 Scan **every** registered agent in one pass (aggregated findings; redaction stays per-source):
@@ -452,7 +461,7 @@ They solve different problems and compose well together. agentsweep covers the s
 
 | | agentsweep | gitleaks | trufflehog |
 |---|---|---|---|
-| **Primary target** | AI agent history (`~/.claude/`, `~/.codex/`, Cursor, 30 agents) | git repos & commits | git repos, filesystems, cloud, CI |
+| **Primary target** | AI agent history (`~/.claude/`, `~/.codex/`, Cursor, 31 agents) | git repos & commits | git repos, filesystems, cloud, CI |
 | **Redacts in place** | ✅ structure-preserving, atomic, reversible (`undo`) | ❌ detection only | ❌ detection only |
 | **Rotation guidance** | ✅ per-provider revocation links | ❌ | ❌ |
 | **Verifies live keys** | ❌ | ❌ | ✅ (network) |
@@ -496,7 +505,7 @@ Install with `uv tool install agentsweep`, run `asweep`, and the interactive men
 Yes. Scanning is read-only. Redaction is gated behind a typed `REDACT` confirmation, writes atomically (temp file → fsync → `os.replace`), keeps an owner-only `.bak` backup, validates the rewritten file parses before committing, and is fully reversible with `agentsweep undo`. Nine safety invariants guard every write. See [Corruption-prevention guarantees](#corruption-prevention-guarantees).
 
 **Which AI coding agents does it support?**
-30, including Claude Code, OpenAI Codex, Cursor, Windsurf, Aider, Cline, Gemini CLI, GitHub Copilot Chat, Continue, and OpenCode. Run `agentsweep list-sources` to see the full list and which ones have history on your machine.
+31, including Claude Code, OpenAI Codex, Cursor, Windsurf, Aider, Cline, Gemini CLI, GitHub Copilot Chat, Continue, and OpenCode. Run `agentsweep list-sources` to see the full list and which ones have history on your machine.
 
 
 
