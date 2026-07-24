@@ -492,6 +492,13 @@ def _with_source_completer(action: argparse.Action) -> argparse.Action:
     return action
 
 
+def _with_rule_id_completer(action: argparse.Action) -> argparse.Action:
+    # setattr, not `action.completer = ...`: argparse.Action has no `completer`
+    # in typeshed, so direct assignment fails mypy. Same dodge as above.
+    setattr(action, "completer", rule_id_completer)
+    return action
+
+
 def _get_completion_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         prog="agentsweep",
@@ -644,10 +651,11 @@ def _get_completion_parser() -> argparse.ArgumentParser:
         "explain",
         description="Print a rule's display name, pattern, and rotation guidance.",
     )
-    explain_rule_id = explain_p.add_argument(
-        "rule_id", nargs="?", help="Rule id to explain (see --list)."
+    _with_rule_id_completer(
+        explain_p.add_argument(
+            "rule_id", nargs="?", help="Rule id to explain (see --list)."
+        )
     )
-    explain_rule_id.completer = rule_id_completer
     explain_p.add_argument(
         "--list", action="store_true", help="Print every known rule id."
     )
