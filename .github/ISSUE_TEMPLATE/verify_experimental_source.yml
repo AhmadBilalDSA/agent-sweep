@@ -1,0 +1,78 @@
+name: Verify an experimental source
+description: You have one of the 14 experimental agents installed — confirm agentsweep finds its history
+title: "[verify]: "
+labels: ["good first issue", "help wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        14 of the 31 supported agents are marked **experimental**: their history
+        paths come from research rather than a real install, so agentsweep may
+        look in the wrong place and quietly find nothing.
+
+        If you actually use one of them, you can confirm or correct it in about
+        five minutes. This is the single most useful first contribution to the
+        project, and it needs no Python.
+
+        ⚠️ **Never paste real secrets.** The commands below print paths and
+        counts only. If you paste scan output, mask every value.
+  - type: input
+    id: source
+    attributes:
+      label: Which source?
+      description: The `source` key, e.g. warp, crush, grok-cli, kiro-cli, zed, codebuff, plandex, qwen-code, pearai, trae, void, junie, mentat, jetbrains-ai
+      placeholder: warp
+    validations:
+      required: true
+  - type: textarea
+    id: detected
+    attributes:
+      label: What does agentsweep think?
+      description: |
+        Run this and paste the row for your source:
+        ```
+        agentsweep list-sources
+        ```
+        The `detected` column tells us whether the path agentsweep expects exists on your machine.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: actual-path
+    attributes:
+      label: Where does the agent really store its history?
+      description: |
+        The real directory on your machine, plus the file format you see there
+        (JSONL, JSON, SQLite `.db`/`.vscdb`, Markdown, something else).
+
+        Handy: `ls -la <the directory>` — paths and filenames are fine to paste, file *contents* are not.
+      placeholder: |
+        OS: macOS 15
+        Expected by agentsweep: ~/.warp/history
+        Actually found at: ~/Library/Application Support/dev.warp.Warp-Stable/
+        Format: SQLite (warp.sqlite), conversations in the `agent_conversations` table
+    validations:
+      required: true
+  - type: textarea
+    id: scan-result
+    attributes:
+      label: Did a scan work? (optional)
+      description: |
+        If the path was already right, `agentsweep scan --source <name>` should report
+        a file count. Paste the **summary line only**, with any findings masked.
+      placeholder: "Scanned 42 files, 18,203 strings, 0 findings"
+  - type: input
+    id: version
+    attributes:
+      label: agentsweep version
+      description: Output of `agentsweep --version`
+      placeholder: "0.1.9"
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: This report contains no real secrets and no raw history-file contents
+          required: true
