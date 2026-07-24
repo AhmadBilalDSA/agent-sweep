@@ -60,8 +60,9 @@ class Source(ABC):
 
 1. Add a `(rule_id, display_name, compiled_regex)` tuple to `RULES` in `scanner.py`.
 2. Add matching guidance to `ROTATION_GUIDANCE` in `scanner.py` (how to rotate/revoke that credential type).
-3. Add a synthetic (non-live-looking) fixture value to `FIXTURES` in `tests/test_ported_rules.py` — split across adjacent string literals so the file itself never contains a contiguous secret-shaped token (GitHub push protection will flag it otherwise).
-4. Run the suite; `test_ported_rules.py` enforces that every rule has both a fixture and rotation guidance.
+3. **Check the keyword prefilter anchor.** Most rules are gated by the Aho-Corasick prefilter: the regex only runs on strings containing a literal anchor extracted from the pattern by `_prefilter_literals()`. If your pattern starts with a character class, alternation, or wildcard, no safe anchor exists and it falls back to running on every string — silently reintroducing the per-string regex cost. Prefer a fixed leading literal (e.g. `AKIA[0-9A-Z]{16}` has `AKIA`; `(?:sk|pk)-live-...` has none). Verify in `tests/test_ported_rules.py` that your rule's fixture still matches — it will fail loudly if the prefilter ever over-skips — and inspect `_prefilter_literals(pattern.pattern)` if you are unsure which anchor was extracted.
+4. Add a synthetic (non-live-looking) fixture value to `FIXTURES` in `tests/test_ported_rules.py` — split across adjacent string literals so the file itself never contains a contiguous secret-shaped token (GitHub push protection will flag it otherwise).
+5. Run the suite; `test_ported_rules.py` enforces that every rule has both a fixture and rotation guidance.
 
 ## Running tests
 

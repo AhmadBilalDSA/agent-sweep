@@ -546,3 +546,163 @@ class TestVerbDispatch:
         out = capsys.readouterr().out
         assert code == 0
         assert json.loads(out) == []
+# ===========================================================================
+# Issue #134: edge-case coverage for add_line ambiguity, comments/blanks,
+# and root+cwd merge behavior with overlapping/conflicting entries.
+# ===========================================================================
+
+class TestAmbiguousLiteralLooksLikeFingerprint:
+    """A literal value shaped like <text>:<digits>:<text> is currently
+    parsed as a fingerprint, not a literal — because add_line only checks
+    that the middle segment is numeric, not that the last segment is a
+    known rule id. These tests document/lock in that current behavior.
+    """
+
+    def test_ambiguous_literal_is_classified_as_fingerprint(self):
+        ig = IgnoreSet()
+        ig.add_line("foo:123:bar")
+        assert "foo:123:bar" in ig.fingerprints
+        assert "foo:123:bar" not in ig.values
+
+    def test_ambiguous_literal_does_not_suppress_by_value(self):
+        # If a real secret's value happens to literally read "foo:123:bar",
+        # writing it verbatim into .agentsweepignore will NOT suppress a
+        # finding via value-matching, because it landed in `fingerprints`
+        # instead of `values`.
+        ig = IgnoreSet()
+        ig.add_line("foo:123:bar")
+        assert not ig.matches("some-rule", "foo:123:bar", "unrelated.jsonl:1:some-rule")
+
+    def test_ambiguous_literal_suppresses_only_as_a_literal_fingerprint_match(self):
+        # It DOES suppress a finding whose own fingerprint happens to equal
+        # "foo:123:bar" (path=foo, line=123, rule=bar) — even though "bar"
+        # is never validated against known rule ids.
+        ig = IgnoreSet()
+        ig.add_line("foo:123:bar")
+        assert ig.matches("bar", "irrelevant-secret-value", "foo:123:bar")
+
+    def test_non_digit_middle_segment_is_treated_as_literal_value(self):
+        # Contrast case: when the middle segment isn't numeric, it is NOT
+        # mistaken for a fingerprint and correctly falls through to values.
+        ig = IgnoreSet()
+        ig.add_line("foo:abc:bar")
+        assert "foo:abc:bar" in ig.values
+        assert "foo:abc:bar" not in ig.fingerprints
+
+
+class TestCommentAndBlankLineEdgeCases:
+    """Additional edge cases for comment/blank-line handling in add_line."""
+
+    def test_line_with_only_hash_is_a_comment(self):
+        ig = IgnoreSet()
+        ig.add_line("#")
+        assert not ig
+
+    def test_tab_only_line_is_treated_as_blank(self):
+        ig = IgnoreSet()
+        ig.add_line("\t\t")
+        assert not ig
+
+    def test_hash_not_at_start_is_not_a_comment(self):
+        # Only a line whose *stripped* form starts with '#' is skipped —
+        # a literal value that merely contains '#' partway through is not.
+        ig = IgnoreSet()
+        ig.add_line("some#value")
+        assert "some#value" in ig.values
+
+    def test_rule_line_has_no_inline_comment_support(self):
+        # Everything after 'rule:' up to end of line becomes the rule id,
+        # comment-and-all — there's no '#' stripping mid-line.
+        ig = IgnoreSet()
+        ig.add_line("rule:aws-access-key # trailing note")
+        assert "aws-access-key # trailing note" in ig.rules
+
+    def test_load_skips_interspersed_comments_and_blanks(self, tmp_path):
+        root = tmp_path / "root"
+        root.mkdir()
+        (root / IGNORE_FILENAME).write_text(
+            "# header comment\n"
+            "rule:aws-access-key\n"
+            "\n"
+            "   \n"
+            "# mid comment\n"
+            "rule:github-pat\n",
+            encoding="utf-8",
+        )
+        ig = load([root])
+        assert ig.rules == {"aws-access-key", "github-pat"}
+
+
+class TestMergeConflictingEntries:
+    """Merging root + cwd .agentsweepignore when entries overlap or
+    ostensibly conflict. Since IgnoreSet stores rules/fingerprints/values
+    as sets, "conflicting" entries simply union — there is no precedence
+    or override semantics between root and cwd.
+    """
+
+    def test_same_rule_in_both_files_dedupes_naturally(self, tmp_path):
+        root = tmp_path / "root"
+        cwd = tmp_path / "cwd"
+        root.mkdir()
+        cwd.mkdir()
+        (root / IGNORE_FILENAME).write_text("rule:aws-access-key\n", encoding="utf-8")
+        (cwd / IGNORE_FILENAME).write_text("rule:aws-access-key\n", encoding="utf-8")
+
+        ig = load([root, cwd])
+        assert ig.rules == {"aws-access-key"}
+        assert len(ig.sources) == 2  # both files still counted as sources
+
+    def test_root_rule_and_cwd_fingerprint_for_same_rule_both_apply(self, tmp_path):
+        # root broadly suppresses a whole rule; cwd narrowly suppresses one
+        # fingerprint of that same rule. Both merge in — the narrower entry
+        # is redundant but harmless, not a conflict.
+        root = tmp_path / "root"
+        cwd = tmp_path / "cwd"
+        root.mkdir()
+        cwd.mkdir()
+        (root / IGNORE_FILENAME).write_text("rule:aws-access-key\n", encoding="utf-8")
+        (cwd / IGNORE_FILENAME).write_text(
+            "session.jsonl:1:aws-access-key\n", encoding="utf-8"
+        )
+
+        ig = load([root, cwd])
+        assert "aws-access-key" in ig.rules
+        assert "session.jsonl:1:aws-access-key" in ig.fingerprints
+        assert ig.matches("aws-access-key", "anything", "other.jsonl:9:aws-access-key")
+
+    def test_root_and_cwd_disagree_on_literal_value_both_suppressed(self, tmp_path):
+        # root ignores one literal secret value, cwd ignores a different one
+        # for the same rule — both end up suppressed since merging unions
+        # rather than replaces.
+        root = tmp_path / "root"
+        cwd = tmp_path / "cwd"
+        root.mkdir()
+        cwd.mkdir()
+        (root / IGNORE_FILENAME).write_text(f"{AWS_KEY}\n", encoding="utf-8")
+        other_key = "AKIAOTHER12345678901"
+        (cwd / IGNORE_FILENAME).write_text(f"{other_key}\n", encoding="utf-8")
+
+        ig = load([root, cwd])
+        assert AWS_KEY in ig.values
+        assert other_key in ig.values
+
+    def test_end_to_end_root_and_cwd_conflicting_entries_merge(
+            self, tmp_path, monkeypatch, capsys):
+        """End-to-end: root ignores by rule, cwd ignores the same finding
+        again by fingerprint. Result should still just suppress it once,
+        not double-count or error."""
+        root = _mkroot(tmp_path, _AWS_ONLY_LINE)
+        cwd = tmp_path / "workdir"
+        cwd.mkdir()
+
+        code0, payload0, _ = _scan_json(root, capsys=capsys)
+        assert code0 == 1
+        aws_fp = payload0[0]["fingerprint"]
+
+        (root / IGNORE_FILENAME).write_text("rule:aws-access-key\n", encoding="utf-8")
+        (cwd / IGNORE_FILENAME).write_text(aws_fp + "\n", encoding="utf-8")
+
+        monkeypatch.chdir(cwd)
+        code, payload, err = _scan_json(root, capsys=capsys)
+        assert code == 0
+        assert payload == []

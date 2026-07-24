@@ -1,0 +1,36 @@
+version: 2
+updates:
+  # Keep GitHub Actions pinned SHAs up to date. Bundle the bumps into one PR
+  # and take minor/patch only: #110 pinned every action to a tested major, and
+  # a major jump (checkout v4 to v7, codeql v3 to v4) can break CI, so those
+  # are handled by hand rather than auto-opened.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    groups:
+      github-actions:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # Keep Python dependencies up to date, bundled into one PR.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps"
+    labels:
+      - "dependencies"
+      - "python"
+    groups:
+      python:
+        patterns: ["*"]
+

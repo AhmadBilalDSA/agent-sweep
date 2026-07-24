@@ -1,0 +1,77 @@
+name: False positive or missed secret
+description: A rule flagged something harmless, or a real secret slipped past the scan
+title: "[detection]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Detection accuracy reports keep the 193 rules honest, so thank you for filing.
+
+        ⚠️ **Never paste a real secret**, even one you have already rotated. Build a
+        *synthetic* example with the same shape instead: keep the prefix and the
+        length, replace the body with obvious filler like
+        `ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Which is it?
+      options:
+        - False positive (flagged something that is not a secret)
+        - False negative (a real secret was not flagged)
+    validations:
+      required: true
+  - type: input
+    id: rule
+    attributes:
+      label: Rule id
+      description: |
+        For a false positive, the rule shown in the finding (e.g. `github-pat`, `generic-api-key`).
+        For a missed secret, the provider it should match, or "none exists yet".
+      placeholder: generic-api-key
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Synthetic example
+      description: |
+        The smallest string that reproduces it, with the secret body replaced by filler.
+        For a false positive, include enough surrounding text to show why it is harmless.
+      render: text
+      placeholder: |
+        # false positive: a git commit SHA in prose gets flagged as generic-api-key
+        "rebased onto a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should happen instead?
+      description: |
+        For a false positive: why this shape is never a live credential, and any anchor
+        that would exclude it safely.
+        For a missed secret: the provider's documented key format, a link to their docs,
+        and the URL where a user rotates or revokes it (needed for `ROTATION_GUIDANCE`).
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: agentsweep version
+      placeholder: "0.1.9"
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        **Need to silence it right now?** Add the finding's fingerprint to
+        `.agentsweepignore` and rerun. That unblocks you locally while this issue
+        gets a proper fix in the rule.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: Every example here is synthetic — no real or previously-live secret appears in this report
+          required: true

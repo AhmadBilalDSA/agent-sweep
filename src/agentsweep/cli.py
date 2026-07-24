@@ -14,11 +14,14 @@ Usage shapes, all supported:
     agentsweep undo [opts]     restore .bak backups
     agentsweep purge [opts]    delete .bak backups (after rotating the keys)
     agentsweep list-sources    list supported agents + which are on this machine
+    agentsweep explain <id>    print a rule's pattern + rotation guidance
+    agentsweep explain --list  print every known rule id
     agentsweep --fix ...       legacy flag form, kept working as an alias
     agentsweep --update        check PyPI for a newer version
 
 Run logic lives in pipeline.py; interaction in menu.py.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -28,7 +31,7 @@ import threading
 import urllib.request
 from pathlib import Path
 
-from . import __version__, ui
+from . import __version__
 from .sources import SOURCES
 
 VERBS = {"scan", "fix", "undo", "purge"}
@@ -73,6 +76,7 @@ def _background_update_notice(args: argparse.Namespace) -> None:
     # Guard: skip in non-interactive / machine-readable contexts, or when the
     # user has explicitly opted out via env var (useful in CI / slow networks).
     import os
+
     try:
         if os.environ.get("AGENTSWEEP_NO_UPDATE"):
             return
@@ -104,11 +108,12 @@ def _background_update_notice(args: argparse.Namespace) -> None:
 
     latest = result[0]
     if latest is not None and _version_tuple(latest) > _version_tuple(__version__):
+        from . import ui
+
         # Route through the shared console so NO_COLOR / --no-color are honored
         # (a raw ANSI print would bypass apply_no_color entirely).
         ui.console.print(
-            f"  ★ agentsweep {latest} available"
-            f" — pip install --upgrade agentsweep",
+            f"  ★ agentsweep {latest} available — pip install --upgrade agentsweep",
             style="dim yellow",
         )
 
@@ -132,6 +137,8 @@ def _run_update_check() -> int:
 def _interactive() -> bool:
     """True when a human is at both ends (stdin tty + terminal stdout)."""
     try:
+        from . import ui
+
         return sys.stdin.isatty() and ui.console.is_terminal
     except Exception:
         return False
@@ -140,18 +147,6 @@ def _interactive() -> bool:
 def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
-
-    # Honor NO_COLOR / --no-color before any styled output (menu, banner,
-    # update notice). The flag is parsed per-verb below; catch it here too so
-    # it applies to the interactive menu and the early --version/--update paths.
-    ui.apply_no_color(ui.resolve_no_color("--no-color" in argv))
-
-    try:
-        import argcomplete
-        completion_parser = _get_completion_parser()
-        argcomplete.autocomplete(completion_parser)
-    except ImportError:
-        pass
 
     if argv and argv[0] in ("-V", "--version"):
         print(f"agentsweep {__version__}")
@@ -162,13 +157,37 @@ def main(argv: list[str] | None = None) -> int:
 
     if argv and argv[0] == "list-sources":
         from .pipeline import list_sources
+
         return list_sources(_parse_list_sources(argv[1:]))
 
     if argv and argv[0] == "completion":
         return _run_completion(argv[1:])
 
+    # Honor NO_COLOR / --no-color before any styled output (menu, banner,
+    # update notice). The flag is parsed per-verb below; catch it here too so
+    # it applies to the interactive menu and the early --version/--update paths.
+    from . import ui
+
+    ui.apply_no_color(ui.resolve_no_color("--no-color" in argv))
+
+    try:
+        import argcomplete
+
+        completion_parser = _get_completion_parser()
+        argcomplete.autocomplete(completion_parser)
+    except ImportError:
+        pass
+
+    # Dispatched here (after completion setup), not alongside -V/--update/
+    # list-sources above: explain is a normal, occasionally-invoked verb, not
+    # a hot path like --version, so it can afford this setup cost — and doing
+    # so is what lets rule_id_completer actually fire for shell completion.
+    if argv and argv[0] == "explain":
+        return _run_explain(argv[1:])
+
     if not argv and _interactive():
         from .menu import run_menu
+
         try:
             return run_menu()
         except KeyboardInterrupt:
@@ -180,10 +199,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if verb == "undo":
             from .pipeline import undo
+
             return undo(_parse_undo(rest))
 
         if verb == "purge":
             from .pipeline import purge
+
             return purge(_parse_purge(rest))
 
         args = _parse_run(verb, rest)
@@ -212,6 +233,8 @@ def main(argv: list[str] | None = None) -> int:
                 return fixed
         return code
     except KeyboardInterrupt:
+        from . import ui
+
         ui.shutdown_notice(during_fix=(verb == "fix"), plain=("--json" in rest))
         return 130
 
@@ -227,10 +250,15 @@ def _route(argv: list[str]) -> tuple[str, list[str]]:
 
 
 def _add_common(ap: argparse.ArgumentParser) -> None:
-    ap.add_argument("--source", choices=list(SOURCES), default="claude-code",
-                    help="Which agent's history (default: claude-code).")
-    ap.add_argument("--root", type=Path,
-                    help="Override the source's default root directory.")
+    ap.add_argument(
+        "--source",
+        choices=list(SOURCES),
+        default="claude-code",
+        help="Which agent's history (default: claude-code).",
+    )
+    ap.add_argument(
+        "--root", type=Path, help="Override the source's default root directory."
+    )
 
 
 def _parse_run(verb: str, rest: list[str]) -> argparse.Namespace:
@@ -240,48 +268,93 @@ def _parse_run(verb: str, rest: list[str]) -> argparse.Namespace:
     )
     # default=None so we can tell "user passed --source" from the implicit
     # default when validating mutual exclusion with --all.
-    ap.add_argument("--source", choices=list(SOURCES), default=None,
-                    help="Which agent's history (default: claude-code).")
-    ap.add_argument("--root", type=Path,
-                    help="Override the source's default root directory.")
-    ap.add_argument("--all", action="store_true",
-                    help="Every registered agent source: scan aggregates "
-                         "findings; fix redacts each source in turn, gated "
-                         "and confirmed separately.")
-    ap.add_argument("--detected", action="store_true",
-                    help="With --all, only scan sources whose history root "
-                         "exists on this machine (same signal as "
-                         "list-sources --detected).")
-    ap.add_argument("-o", "--output", type=Path,
-                    help="Write findings as JSON to this file instead of "
-                         "flooding the terminal.")
-    ap.add_argument("--json", action="store_true",
-                    help="Emit findings as JSON to stdout (no banner/styling).")
-    ap.add_argument("--no-color", action="store_true",
-                    help="Disable ANSI colors/styling in human output "
-                         "(also honored via the NO_COLOR env var).")
-    ap.add_argument("--format", choices=["sarif"],
-                    help="Emit findings in an interchange format instead of "
-                         "the default report: sarif = SARIF 2.1.0 for GitHub "
-                         "code scanning and SARIF viewers (scan only).")
-    ap.add_argument("--no-ignore", action="store_true",
-                    help="Ignore any .agentsweepignore files.")
+    ap.add_argument(
+        "--source",
+        choices=list(SOURCES),
+        default=None,
+        help="Which agent's history (default: claude-code).",
+    )
+    ap.add_argument(
+        "--root", type=Path, help="Override the source's default root directory."
+    )
+    ap.add_argument(
+        "--all",
+        action="store_true",
+        help="Every registered agent source: scan aggregates "
+        "findings; fix redacts each source in turn, gated "
+        "and confirmed separately.",
+    )
+    ap.add_argument(
+        "--detected",
+        action="store_true",
+        help="With --all, only scan sources whose history root "
+        "exists on this machine (same signal as "
+        "list-sources --detected).",
+    )
+    ap.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        help="Write findings as JSON to this file instead of flooding the terminal.",
+    )
+    ap.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit findings as JSON to stdout (no banner/styling).",
+    )
+    ap.add_argument(
+        "--report",
+        action="store_true",
+        help="Include blast-radius report in JSON output (implies --json).",
+    )
+    ap.add_argument(
+        "--no-color",
+        action="store_true",
+        help="Disable ANSI colors/styling in human output "
+        "(also honored via the NO_COLOR env var).",
+    )
+    ap.add_argument(
+        "--format",
+        choices=["sarif"],
+        help="Emit findings in an interchange format instead of "
+        "the default report: sarif = SARIF 2.1.0 for GitHub "
+        "code scanning and SARIF viewers (scan only).",
+    )
+    ap.add_argument(
+        "--no-ignore", action="store_true", help="Ignore any .agentsweepignore files."
+    )
     # Redaction flags (used by `fix` / legacy --fix; harmless on `scan`).
-    ap.add_argument("--no-backup", action="store_true",
-                    help="Skip .bak file creation (NOT recommended).")
-    ap.add_argument("--force", action="store_true",
-                    help="Bypass soft safety checks (mtime, running-process).")
-    ap.add_argument("--allow-production", action="store_true",
-                    help="Allow --fix against the default production root.")
+    ap.add_argument(
+        "--no-backup",
+        action="store_true",
+        help="Skip .bak file creation (NOT recommended).",
+    )
+    ap.add_argument(
+        "--force",
+        action="store_true",
+        help="Bypass soft safety checks (mtime, running-process).",
+    )
+    ap.add_argument(
+        "--allow-production",
+        action="store_true",
+        help="Allow --fix against the default production root.",
+    )
     args = ap.parse_args(rest)
-    args.fix = (verb == "fix")
+    args.fix = verb == "fix"
 
     if args.format is not None:
         if args.json:
-            ap.error("cannot use --json with --format sarif; pick one output "
-                     "format")
+            ap.error("cannot use --json with --format sarif; pick one output format")
         if args.fix:
             ap.error("--format is a scan output format; not valid with fix")
+
+    if getattr(args, "report", False):
+        if args.fix:
+            ap.error("--report is a scan output option; not valid with fix")
+        if args.format is not None:
+            ap.error("cannot use --report with --format sarif; blast-radius is JSON-only")
+        # Contract: --report always emits machine JSON (with blast_radius).
+        args.json = True
 
     if args.all:
         if args.source is not None:
@@ -292,8 +365,9 @@ def _parse_run(verb: str, rest: list[str]) -> argparse.Namespace:
         args.source = "claude-code"
     else:
         if args.detected:
-            ap.error("--detected requires --all "
-                     "(or use: agentsweep list-sources --detected)")
+            ap.error(
+                "--detected requires --all (or use: agentsweep list-sources --detected)"
+            )
         if args.source is None:
             args.source = "claude-code"
     return args
@@ -303,13 +377,75 @@ def _parse_list_sources(rest: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser(
         prog="agentsweep list-sources",
         description="List every supported agent source and whether its "
-                    "history root exists on this machine. Read-only.",
+        "history root exists on this machine. Read-only.",
     )
-    ap.add_argument("--json", action="store_true",
-                    help="Emit the source list as JSON to stdout.")
-    ap.add_argument("--detected", action="store_true",
-                    help="Show only sources whose history root exists here.")
+    ap.add_argument(
+        "--json", action="store_true", help="Emit the source list as JSON to stdout."
+    )
+    ap.add_argument(
+        "--detected",
+        action="store_true",
+        help="Show only sources whose history root exists here.",
+    )
     return ap.parse_args(rest)
+
+
+def _parse_explain(rest: list[str]) -> argparse.Namespace:
+    ap = argparse.ArgumentParser(
+        prog="agentsweep explain",
+        description="Print a detection rule's display name, pattern, and "
+        "rotation guidance. Read-only; touches no files, needs "
+        "no --source/--root.",
+    )
+    ap.add_argument(
+        "rule_id",
+        nargs="?",
+        help="Rule id to explain, e.g. stripe-live. See --list for all ids.",
+    )
+    ap.add_argument(
+        "--list",
+        action="store_true",
+        help="Print every known rule id, one per line "
+        "(pipe into --exclude-rule/--only-rule if those land).",
+    )
+    args = ap.parse_args(rest)
+    if not args.list and not args.rule_id:
+        ap.error("rule_id is required unless --list is given")
+    return args
+
+
+def _run_explain(rest: list[str]) -> int:
+    """Implement `agentsweep explain`: read-only lookup into scanner.RULES /
+    scanner.ROTATION_GUIDANCE / scanner.DETECTOR_IDS. No file access."""
+    args = _parse_explain(rest)
+
+    from .scanner import DETECTOR_IDS, ROTATION_GUIDANCE, RULES
+
+    if args.list:
+        all_ids = sorted({rule_id for rule_id, _display, _pattern in RULES} | set(DETECTOR_IDS))
+        for rule_id in all_ids:
+            print(rule_id)
+        return 0
+
+    rule_id = args.rule_id
+
+    for rid, display, pattern in RULES:
+        if rid == rule_id:
+            print(f"{display} ({rid})")
+            print(f"pattern: {pattern.pattern}")
+            print(f"rotation guidance: {ROTATION_GUIDANCE.get(rid, '(none recorded)')}")
+            return 0
+
+    if rule_id in DETECTOR_IDS:
+        print(f"{rule_id} (function-based detector — no static regex pattern)")
+        print(f"rotation guidance: {ROTATION_GUIDANCE.get(rule_id, '(none recorded)')}")
+        return 0
+
+    print(
+        f"error: unknown rule id {rule_id!r} (see: agentsweep explain --list)",
+        file=sys.stderr,
+    )
+    return 2
 
 
 def _parse_undo(rest: list[str]) -> argparse.Namespace:
@@ -325,14 +461,16 @@ def _parse_purge(rest: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser(
         prog="agentsweep purge",
         description="Delete *.bak backups once the leaked keys are rotated. "
-                    "The backups hold the pre-redaction originals, so this "
-                    "is permanent — `agentsweep undo` stops working for "
-                    "them.",
+        "The backups hold the pre-redaction originals, so this "
+        "is permanent — `agentsweep undo` stops working for "
+        "them.",
     )
     _add_common(ap)
-    ap.add_argument("--yes", action="store_true",
-                    help="Skip the confirmation prompt (required when not "
-                         "running on a terminal).")
+    ap.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip the confirmation prompt (required when not running on a terminal).",
+    )
     return ap.parse_args(rest)
 
 
@@ -341,8 +479,23 @@ def source_completer(prefix: str, **kwargs) -> list[str]:
     return [s for s in SOURCES if s.startswith(prefix)]
 
 
+def rule_id_completer(prefix: str, **kwargs) -> list[str]:
+    """Dynamically complete rule ids for `explain` from scanner's registries."""
+    from .scanner import DETECTOR_IDS, RULES
+
+    all_ids = sorted({rule_id for rule_id, _display, _pattern in RULES} | set(DETECTOR_IDS))
+    return [rule_id for rule_id in all_ids if rule_id.startswith(prefix)]
+
+
 def _with_source_completer(action: argparse.Action) -> argparse.Action:
     setattr(action, "completer", source_completer)
+    return action
+
+
+def _with_rule_id_completer(action: argparse.Action) -> argparse.Action:
+    # setattr, not `action.completer = ...`: argparse.Action has no `completer`
+    # in typeshed, so direct assignment fails mypy. Same dodge as above.
+    setattr(action, "completer", rule_id_completer)
     return action
 
 
@@ -358,60 +511,164 @@ def _get_completion_parser() -> argparse.ArgumentParser:
 
     # scan
     scan_p = subparsers.add_parser("scan", description="Scan history files.")
-    scan_source = scan_p.add_argument("--source", choices=list(SOURCES), default=None,
-                                      help="Which agent's history (default: claude-code).")
+    scan_source = scan_p.add_argument(
+        "--source",
+        choices=list(SOURCES),
+        default=None,
+        help="Which agent's history (default: claude-code).",
+    )
     _with_source_completer(scan_source)
-    scan_p.add_argument("--root", type=Path, help="Override the source's default root directory.")
-    scan_p.add_argument("--all", action="store_true", help="Scan every registered agent source.")
-    scan_p.add_argument("--detected", action="store_true", help="Only scan sources whose history root exists.")
-    scan_p.add_argument("-o", "--output", type=Path, help="Write findings as JSON to this file.")
-    scan_p.add_argument("--json", action="store_true", help="Emit findings as JSON to stdout.")
-    scan_p.add_argument("--no-color", action="store_true", help="Disable ANSI colors/styling in human output.")
-    scan_p.add_argument("--no-ignore", action="store_true", help="Ignore any .agentsweepignore files.")
-    scan_p.add_argument("--no-backup", action="store_true", help="Skip .bak file creation.")
+    scan_p.add_argument(
+        "--root", type=Path, help="Override the source's default root directory."
+    )
+    scan_p.add_argument(
+        "--all", action="store_true", help="Scan every registered agent source."
+    )
+    scan_p.add_argument(
+        "--detected",
+        action="store_true",
+        help="Only scan sources whose history root exists.",
+    )
+    scan_p.add_argument(
+        "-o", "--output", type=Path, help="Write findings as JSON to this file."
+    )
+    scan_p.add_argument(
+        "--json", action="store_true", help="Emit findings as JSON to stdout."
+    )
+    scan_p.add_argument(
+        "--report",
+        action="store_true",
+        help="Include blast-radius report in JSON output (implies --json).",
+    )
+    scan_p.add_argument(
+        "--no-color",
+        action="store_true",
+        help="Disable ANSI colors/styling in human output.",
+    )
+    scan_p.add_argument(
+        "--no-ignore", action="store_true", help="Ignore any .agentsweepignore files."
+    )
+    scan_p.add_argument(
+        "--no-backup", action="store_true", help="Skip .bak file creation."
+    )
     scan_p.add_argument("--force", action="store_true", help="Bypass safety checks.")
-    scan_p.add_argument("--allow-production", action="store_true", help="Allow against default production root.")
+    scan_p.add_argument(
+        "--allow-production",
+        action="store_true",
+        help="Allow against default production root.",
+    )
 
     # fix
     fix_p = subparsers.add_parser("fix", description="Redact secrets in history.")
-    fix_source = fix_p.add_argument("--source", choices=list(SOURCES), default=None,
-                                     help="Which agent's history (default: claude-code).")
+    fix_source = fix_p.add_argument(
+        "--source",
+        choices=list(SOURCES),
+        default=None,
+        help="Which agent's history (default: claude-code).",
+    )
     _with_source_completer(fix_source)
-    fix_p.add_argument("--root", type=Path, help="Override the source's default root directory.")
-    fix_p.add_argument("--all", action="store_true", help="Redact every agent source with findings, one at a time.")
-    fix_p.add_argument("--detected", action="store_true", help="With --all, only sources whose history root exists.")
-    fix_p.add_argument("-o", "--output", type=Path, help="Write findings as JSON to this file.")
-    fix_p.add_argument("--json", action="store_true", help="Emit findings as JSON to stdout.")
-    fix_p.add_argument("--no-color", action="store_true", help="Disable ANSI colors/styling in human output.")
-    fix_p.add_argument("--no-ignore", action="store_true", help="Ignore any .agentsweepignore files.")
-    fix_p.add_argument("--no-backup", action="store_true", help="Skip .bak file creation.")
+    fix_p.add_argument(
+        "--root", type=Path, help="Override the source's default root directory."
+    )
+    fix_p.add_argument(
+        "--all",
+        action="store_true",
+        help="Redact every agent source with findings, one at a time.",
+    )
+    fix_p.add_argument(
+        "--detected",
+        action="store_true",
+        help="With --all, only sources whose history root exists.",
+    )
+    fix_p.add_argument(
+        "-o", "--output", type=Path, help="Write findings as JSON to this file."
+    )
+    fix_p.add_argument(
+        "--json", action="store_true", help="Emit findings as JSON to stdout."
+    )
+    fix_p.add_argument(
+        "--no-color",
+        action="store_true",
+        help="Disable ANSI colors/styling in human output.",
+    )
+    fix_p.add_argument(
+        "--no-ignore", action="store_true", help="Ignore any .agentsweepignore files."
+    )
+    fix_p.add_argument(
+        "--no-backup", action="store_true", help="Skip .bak file creation."
+    )
     fix_p.add_argument("--force", action="store_true", help="Bypass safety checks.")
-    fix_p.add_argument("--allow-production", action="store_true", help="Allow against default production root.")
+    fix_p.add_argument(
+        "--allow-production",
+        action="store_true",
+        help="Allow against default production root.",
+    )
 
     # undo
     undo_p = subparsers.add_parser("undo", description="Restore backups.")
-    undo_source = undo_p.add_argument("--source", choices=list(SOURCES), default="claude-code",
-                                       help="Which agent's history.")
+    undo_source = undo_p.add_argument(
+        "--source",
+        choices=list(SOURCES),
+        default="claude-code",
+        help="Which agent's history.",
+    )
     _with_source_completer(undo_source)
-    undo_p.add_argument("--root", type=Path, help="Override the source's default root directory.")
+    undo_p.add_argument(
+        "--root", type=Path, help="Override the source's default root directory."
+    )
 
     # purge
     purge_p = subparsers.add_parser("purge", description="Delete backups.")
-    purge_source = purge_p.add_argument("--source", choices=list(SOURCES), default="claude-code",
-                                          help="Which agent's history.")
+    purge_source = purge_p.add_argument(
+        "--source",
+        choices=list(SOURCES),
+        default="claude-code",
+        help="Which agent's history.",
+    )
     _with_source_completer(purge_source)
-    purge_p.add_argument("--root", type=Path, help="Override the source's default root directory.")
-    purge_p.add_argument("--yes", action="store_true", help="Skip the confirmation prompt.")
+    purge_p.add_argument(
+        "--root", type=Path, help="Override the source's default root directory."
+    )
+    purge_p.add_argument(
+        "--yes", action="store_true", help="Skip the confirmation prompt."
+    )
 
     # list-sources
-    ls_p = subparsers.add_parser("list-sources", description="List supported agent sources.")
-    ls_p.add_argument("--json", action="store_true", help="Emit the source list as JSON to stdout.")
-    ls_p.add_argument("--detected", action="store_true", help="Show only sources whose history root exists.")
+    ls_p = subparsers.add_parser(
+        "list-sources", description="List supported agent sources."
+    )
+    ls_p.add_argument(
+        "--json", action="store_true", help="Emit the source list as JSON to stdout."
+    )
+    ls_p.add_argument(
+        "--detected",
+        action="store_true",
+        help="Show only sources whose history root exists.",
+    )
+
+    # explain
+    explain_p = subparsers.add_parser(
+        "explain",
+        description="Print a rule's display name, pattern, and rotation guidance.",
+    )
+    _with_rule_id_completer(
+        explain_p.add_argument(
+            "rule_id", nargs="?", help="Rule id to explain (see --list)."
+        )
+    )
+    explain_p.add_argument(
+        "--list", action="store_true", help="Print every known rule id."
+    )
 
     # completion
-    comp_p = subparsers.add_parser("completion", description="Generate shell completion scripts.")
-    comp_p.add_argument("shell", choices=["bash", "zsh", "fish", "powershell"],
-                        help="The shell to generate completions for.")
+    comp_p = subparsers.add_parser(
+        "completion", description="Generate shell completion scripts."
+    )
+    comp_p.add_argument(
+        "shell",
+        choices=["bash", "zsh", "fish", "powershell"],
+        help="The shell to generate completions for.",
+    )
 
     return ap
 
@@ -421,8 +678,11 @@ def _parse_completion(rest: list[str]) -> argparse.Namespace:
         prog="agentsweep completion",
         description="Generate shell completion scripts for agentsweep.",
     )
-    ap.add_argument("shell", choices=["bash", "zsh", "fish", "powershell"],
-                    help="The shell to generate completions for.")
+    ap.add_argument(
+        "shell",
+        choices=["bash", "zsh", "fish", "powershell"],
+        help="The shell to generate completions for.",
+    )
     return ap.parse_args(rest)
 
 

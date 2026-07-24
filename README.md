@@ -15,9 +15,9 @@
 [![GitHub Stars](https://img.shields.io/github/stars/Ishannaik/agent-sweep)](https://github.com/Ishannaik/agent-sweep/stargazers)
 [![Visitors](https://visitor-badge.laobi.icu/badge?page_id=Ishannaik.agent-sweep)](https://github.com/Ishannaik/agent-sweep)
 
-<video src="https://github.com/Ishannaik/agent-sweep/raw/main/docs/agentsweep-demo.mp4" poster="docs/agentsweep-demo-poster.png" controls muted width="480"></video>
+[![AgentSweep demo, scanning and redacting secrets in AI agent history](docs/agentsweep-demo.gif)](https://github.com/Ishannaik/agent-sweep/raw/main/docs/agentsweep-demo.mp4)
 
-[Watch the 25-second demo](https://github.com/Ishannaik/agent-sweep/raw/main/docs/agentsweep-demo.mp4)
+[Watch the full clip with sound](https://github.com/Ishannaik/agent-sweep/raw/main/docs/agentsweep-demo.mp4)
 
 > **Prevention:** Don't paste API keys into cloud-backed AI agents at all. The key transits the provider's servers before it ever hits your disk.
 >
@@ -408,6 +408,34 @@ agentsweep purge --yes                 # non-interactive (scripts / CI)
 
 The patterns: AWS access keys, GitHub tokens (PAT/OAuth/App/fine-grained), Stripe live/test, OpenAI, Anthropic, Google API, Slack bot/user/webhook, Hugging Face, JWT, PEM private keys, DB URLs with embedded passwords, and npm/PyPI/SendGrid/Twilio tokens. On top of those sit 167 rules ported from the [gitleaks](https://github.com/gitleaks/gitleaks) pack covering GitLab, Grafana, HashiCorp Vault/Terraform, DigitalOcean, Shopify, PlanetScale, Databricks, Atlassian, Azure AD, 1Password, Sentry, New Relic, Mailgun, Datadog, Twilio, Twitter/X, Twitch, Yandex, JFrog, Snyk, Mailchimp, curl credentials on the command line, and many more. The patterns run high-precision: false positives are rare, and provider-context rules are keyword-gated so large pastes stay fast.
 
+## `.agentsweepignore` — suppress false positives
+
+A false positive you already understand should not keep showing up. Put an
+`.agentsweepignore` file in the **scan root** or your **current working
+directory** (both are read; entries merge). Each non-comment line is one of
+three forms:
+
+| Form | What it suppresses |
+| --- | --- |
+| `rule:<rule-id>` | Every finding from that rule |
+| `<relpath>:<line>:<rule>` | One exact finding — the fingerprint agentsweep prints next to each hit |
+| a bare literal | Any finding whose secret value matches |
+
+Example:
+
+```
+# never flag the demo AWS key
+AKIAIOSFODNN7EXAMPLE
+# ignore the whole slack-webhook rule
+rule:slack-webhook
+# one exact false positive in a fixture
+tests/fixtures/claude/sample.jsonl:42:aws-access-key-id
+```
+
+Copy-paste path: run a scan, copy the fingerprint printed beside the false
+positive, paste it into `.agentsweepignore`, re-scan — it will be gone. Use
+`--no-ignore` to bypass both files when you want a completely fresh pass.
+
 ## What's NOT detected
 
 - Custom/proprietary secrets without a recognizable prefix.
@@ -432,6 +460,32 @@ They solve different problems and compose well together. agentsweep covers the s
 | **Runs fully offline** | ✅ zero network calls | ✅ | ⚠️ verification needs network |
 
 Scan your codebase and CI with gitleaks or trufflehog, then scan the agent-history surface they don't touch with agentsweep. Running both is the intent: they overlap and cover each other's blind spots.
+
+## Troubleshooting — “no history found” / permissions / paths
+
+If `list-sources` shows a source as *not detected* or a scan finds nothing,
+work through this before assuming there are no secrets:
+
+1. **Confirm the source is actually installed and detected.**
+   ```bash
+   agentsweep list-sources
+   ```
+   A missing tool is fine; a tool you use daily should not be missing.
+
+2. **Check a non-default profile.** Claude Code (and some other agents) can
+   store history outside the default config dir. Point at the profile you
+   actually use:
+   ```bash
+   CLAUDE_CONFIG_DIR=~/.claude-work agentsweep list-sources --detected
+   agentsweep scan --root ~/.claude-work/projects
+   ```
+   (Other sources have their own env overrides — see the source table.)
+
+3. **Point `--root` at a specific directory** to isolate whether default root
+   resolution is the problem:
+   ```bash
+   agentsweep scan --root /path/to/history
+   ```
 
 ## FAQ
 
