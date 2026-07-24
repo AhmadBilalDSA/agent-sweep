@@ -14,6 +14,8 @@ Usage shapes, all supported:
     agentsweep undo [opts]     restore .bak backups
     agentsweep purge [opts]    delete .bak backups (after rotating the keys)
     agentsweep list-sources    list supported agents + which are on this machine
+    agentsweep explain <id>    print a rule's pattern + rotation guidance
+    agentsweep explain --list  print every known rule id
     agentsweep --fix ...       legacy flag form, kept working as an alias
     agentsweep --update        check PyPI for a newer version
 
@@ -175,6 +177,13 @@ def main(argv: list[str] | None = None) -> int:
         argcomplete.autocomplete(completion_parser)
     except ImportError:
         pass
+
+    # Dispatched here (after completion setup), not alongside -V/--update/
+    # list-sources above: explain is a normal, occasionally-invoked verb, not
+    # a hot path like --version, so it can afford this setup cost — and doing
+    # so is what lets rule_id_completer actually fire for shell completion.
+    if argv and argv[0] == "explain":
+        return _run_explain(argv[1:])
 
     if not argv and _interactive():
         from .menu import run_menu
@@ -381,6 +390,64 @@ def _parse_list_sources(rest: list[str]) -> argparse.Namespace:
     return ap.parse_args(rest)
 
 
+def _parse_explain(rest: list[str]) -> argparse.Namespace:
+    ap = argparse.ArgumentParser(
+        prog="agentsweep explain",
+        description="Print a detection rule's display name, pattern, and "
+        "rotation guidance. Read-only; touches no files, needs "
+        "no --source/--root.",
+    )
+    ap.add_argument(
+        "rule_id",
+        nargs="?",
+        help="Rule id to explain, e.g. stripe-live. See --list for all ids.",
+    )
+    ap.add_argument(
+        "--list",
+        action="store_true",
+        help="Print every known rule id, one per line "
+        "(pipe into --exclude-rule/--only-rule if those land).",
+    )
+    args = ap.parse_args(rest)
+    if not args.list and not args.rule_id:
+        ap.error("rule_id is required unless --list is given")
+    return args
+
+
+def _run_explain(rest: list[str]) -> int:
+    """Implement `agentsweep explain`: read-only lookup into scanner.RULES /
+    scanner.ROTATION_GUIDANCE / scanner.DETECTOR_IDS. No file access."""
+    args = _parse_explain(rest)
+
+    from .scanner import DETECTOR_IDS, ROTATION_GUIDANCE, RULES
+
+    if args.list:
+        all_ids = sorted({rule_id for rule_id, _display, _pattern in RULES} | set(DETECTOR_IDS))
+        for rule_id in all_ids:
+            print(rule_id)
+        return 0
+
+    rule_id = args.rule_id
+
+    for rid, display, pattern in RULES:
+        if rid == rule_id:
+            print(f"{display} ({rid})")
+            print(f"pattern: {pattern.pattern}")
+            print(f"rotation guidance: {ROTATION_GUIDANCE.get(rid, '(none recorded)')}")
+            return 0
+
+    if rule_id in DETECTOR_IDS:
+        print(f"{rule_id} (function-based detector — no static regex pattern)")
+        print(f"rotation guidance: {ROTATION_GUIDANCE.get(rule_id, '(none recorded)')}")
+        return 0
+
+    print(
+        f"error: unknown rule id {rule_id!r} (see: agentsweep explain --list)",
+        file=sys.stderr,
+    )
+    return 2
+
+
 def _parse_undo(rest: list[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser(
         prog="agentsweep undo",
@@ -412,8 +479,23 @@ def source_completer(prefix: str, **kwargs) -> list[str]:
     return [s for s in SOURCES if s.startswith(prefix)]
 
 
+def rule_id_completer(prefix: str, **kwargs) -> list[str]:
+    """Dynamically complete rule ids for `explain` from scanner's registries."""
+    from .scanner import DETECTOR_IDS, RULES
+
+    all_ids = sorted({rule_id for rule_id, _display, _pattern in RULES} | set(DETECTOR_IDS))
+    return [rule_id for rule_id in all_ids if rule_id.startswith(prefix)]
+
+
 def _with_source_completer(action: argparse.Action) -> argparse.Action:
     setattr(action, "completer", source_completer)
+    return action
+
+
+def _with_rule_id_completer(action: argparse.Action) -> argparse.Action:
+    # setattr, not `action.completer = ...`: argparse.Action has no `completer`
+    # in typeshed, so direct assignment fails mypy. Same dodge as above.
+    setattr(action, "completer", rule_id_completer)
     return action
 
 
@@ -562,6 +644,20 @@ def _get_completion_parser() -> argparse.ArgumentParser:
         "--detected",
         action="store_true",
         help="Show only sources whose history root exists.",
+    )
+
+    # explain
+    explain_p = subparsers.add_parser(
+        "explain",
+        description="Print a rule's display name, pattern, and rotation guidance.",
+    )
+    _with_rule_id_completer(
+        explain_p.add_argument(
+            "rule_id", nargs="?", help="Rule id to explain (see --list)."
+        )
+    )
+    explain_p.add_argument(
+        "--list", action="store_true", help="Print every known rule id."
     )
 
     # completion
