@@ -143,7 +143,7 @@ RULES: list[tuple[str, str, re.Pattern]] = [
     ('digitalocean-refresh-token', 'DigitalOcean OAuth refresh token',
         re.compile('(?i)\\bdor_v1_[a-f0-9]{64}\\b')),
     ('dockerhub-pat', 'Docker Hub personal access token',
-        re.compile(r'\bdckr_pat_[A-Za-z0-9_-]{27}\b')),
+        re.compile(r'\bdckr_pat_[A-Za-z0-9_-]{27}(?=[^A-Za-z0-9_-]|$)')),
     ('doppler-api-token', 'Doppler API token',
         re.compile('\\bdp\\.pt\\.(?i:[a-z0-9]{43})\\b')),
     ('duffel-api-token', 'Duffel API token',
