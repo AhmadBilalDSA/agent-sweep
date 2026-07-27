@@ -13,6 +13,7 @@ copy-paste path is: see a false positive, paste its fingerprint into
 """
 from __future__ import annotations
 
+import fnmatch
 from pathlib import Path
 
 IGNORE_FILENAME = ".agentsweepignore"
@@ -27,14 +28,20 @@ class IgnoreSet:
         self.rules: set[str] = set()
         self.fingerprints: set[str] = set()
         self.values: set[str] = set()
+        self.globs: list[str] = []
         self.sources: list[Path] = []
 
     def __bool__(self) -> bool:
-        return bool(self.rules or self.fingerprints or self.values)
+        return bool(self.rules or self.fingerprints or self.values or self.globs)
 
     def add_line(self, raw: str) -> None:
         line = raw.strip()
         if not line or line.startswith("#"):
+            return
+        if line.startswith("path:"):
+            glob = line[len("path:"):].strip()
+            if glob:
+                self.globs.append(glob)
             return
         if line.startswith("rule:"):
             self.rules.add(line[len("rule:"):].strip())
@@ -47,10 +54,12 @@ class IgnoreSet:
         else:
             self.values.add(line)
 
-    def matches(self, rule: str, value: str, fp: str) -> bool:
+    def matches(self, rule: str, value: str, fp: str, relpath: str = "") -> bool:
         return (rule in self.rules
                 or fp in self.fingerprints
-                or value in self.values)
+                or value in self.values
+                or any(fnmatch.fnmatch(relpath, glob) for glob in self.globs)
+                )
 
 
 def load(roots: list[Path]) -> IgnoreSet:

@@ -104,6 +104,14 @@ class TestIgnoreSetAddLine:
         ig = IgnoreSet()
         ig.add_line("rule: aws-access-key ")
         assert "aws-access-key" in ig.rules
+        
+    def test_path_prefix_goes_to_globs(self):
+        ig = IgnoreSet()
+        ig.add_line("path:**/fixtures/**")
+        assert "**/fixtures/**" in ig.globs
+        assert not ig.rules
+        assert not ig.fingerprints
+        assert not ig.values
 
     def test_fingerprint_pattern_goes_to_fingerprints(self):
         ig = IgnoreSet()
@@ -179,6 +187,16 @@ class TestIgnoreSetMatches:
         # does NOT match a different secret value
         assert not ig.matches("aws-access-key", "AKIAOTHER12345678901", "f:1:aws-access-key")
 
+    def test_path_glob_matches_relpath(self):
+        ig = IgnoreSet()
+        ig.add_line("path:**/fixtures/**")
+        assert ig.matches(
+            "aws-access-key",
+            AWS_KEY,
+            "tests/fixtures/sample.jsonl:1:aws-access-key",
+            "tests/fixtures/sample.jsonl",
+        )
+    
     def test_no_match_returns_false(self):
         ig = IgnoreSet()
         ig.add_line("rule:aws-access-key")
