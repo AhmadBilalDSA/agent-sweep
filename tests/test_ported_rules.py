@@ -50,6 +50,7 @@ FIXTURES: dict[str, str] = {
     'digitalocean-access-token': 'doo_v1_a1b2c3a1b2c3a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2',
     'digitalocean-pat': 'dop_v1_a1b2c3a1b2c3a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2',
     'digitalocean-refresh-token': 'dor_v1_a1b2c3a1b2c3a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2',
+    'dockerhub-pat': 'dckr_pat_a1b2c3a1b2c3a1' 'b2c3a1b2c3a1b',
     'doppler-api-token': 'dp.pt.a1b2c3a1b2c3a1b2c3' 'a1b2c3a1b2c3a1b2c3a1b2c3a',
     'duffel-api-token': 'duffel_test_a1b2c3a1b2c3a1b' '2c3a1b2c3a1b2c3a1b2c3a1b2c3a',
     'dynatrace-api-token': 'dt0c01.a1b2c3a1b2c3a1b2c3a1b2c3.a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2c3a1b2',
