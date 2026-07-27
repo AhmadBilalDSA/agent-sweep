@@ -858,6 +858,8 @@ def _scan_file(
             finding.file = f
             finding.line = line_num
             finding.keypath = keypath
+            # --exclude-rule / --only-rule are CLI presentation filters, not
+            # ignore-file suppressions, so they do not increment `suppressed`.
             if finding.rule in exclude_rules:
                 continue
             if only_rules is not None and finding.rule not in only_rules:
