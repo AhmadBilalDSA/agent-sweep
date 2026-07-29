@@ -3,3 +3,6 @@ contact_links:
   - name: 🔒 Report a security vulnerability (privately)
     url: https://github.com/Ishannaik/agent-sweep/security/advisories/new
     about: Please report security issues through a private GitHub security advisory, not a public issue.
+  - name: 💬 Chat on Discord
+    url: https://discord.gg/KKvtRhQvRv
+    about: Ask a question, get help with a scan, or claim an issue before you start.

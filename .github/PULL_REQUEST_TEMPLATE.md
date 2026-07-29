@@ -35,3 +35,7 @@ two PRs). See CONTRIBUTING.md for the project's conventions.
 - [ ] **New source?** Registered in `SOURCES` with process markers, a menu entry, and a round-trip test (see CONTRIBUTING.md → "Adding a new source — checklist")
 - [ ] `--json` and non-tty output stay machine-clean (no banners / styling, no `ui` import on those paths)
 - [ ] Did not re-introduce `force-include` in `pyproject.toml`
+
+---
+
+Stuck on a review comment or want to talk through an approach? [Discord](https://discord.gg/KKvtRhQvRv).
