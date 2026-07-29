@@ -28,15 +28,20 @@ import argparse
 import json
 import sys
 import threading
-import urllib.request
 from pathlib import Path
 
 from . import __version__
-from .sources import SOURCES
 
 VERBS = {"scan", "fix", "undo", "purge"}
 
 _PYPI_URL = "https://pypi.org/pypi/agentsweep/json"
+
+
+def _sources() -> dict:
+    """Lazy accessor for the SOURCES registry (avoids import cost on -V)."""
+    from .sources import SOURCES
+
+    return SOURCES
 
 
 def check_for_update(timeout: int = 2) -> tuple[str | None, str | None]:
@@ -45,6 +50,8 @@ def check_for_update(timeout: int = 2) -> tuple[str | None, str | None]:
     Fetches PyPI metadata synchronously.  On any failure returns
     (None, error_string) so the caller can decide whether to surface it.
     """
+    import urllib.request
+
     try:
         with urllib.request.urlopen(_PYPI_URL, timeout=timeout) as resp:  # nosec B310 # _PYPI_URL is a hardcoded https:// constant, never user input
             data = json.loads(resp.read())
@@ -91,6 +98,8 @@ def _background_update_notice(args: argparse.Namespace) -> None:
     result: list[str | None] = [None]  # mutable box for thread result
 
     def _fetch() -> None:
+        import urllib.request
+
         try:
             with urllib.request.urlopen(_PYPI_URL, timeout=1.5) as resp:  # nosec B310 # _PYPI_URL is a hardcoded https:// constant, never user input
                 data = json.loads(resp.read())
@@ -252,7 +261,7 @@ def _route(argv: list[str]) -> tuple[str, list[str]]:
 def _add_common(ap: argparse.ArgumentParser) -> None:
     ap.add_argument(
         "--source",
-        choices=list(SOURCES),
+        choices=list(_sources()),
         default="claude-code",
         help="Which agent's history (default: claude-code).",
     )
@@ -270,7 +279,7 @@ def _parse_run(verb: str, rest: list[str]) -> argparse.Namespace:
     # default when validating mutual exclusion with --all.
     ap.add_argument(
         "--source",
-        choices=list(SOURCES),
+        choices=list(_sources()),
         default=None,
         help="Which agent's history (default: claude-code).",
     )
@@ -476,7 +485,7 @@ def _parse_purge(rest: list[str]) -> argparse.Namespace:
 
 def source_completer(prefix: str, **kwargs) -> list[str]:
     """Dynamically complete --source values from the SOURCES registry."""
-    return [s for s in SOURCES if s.startswith(prefix)]
+    return [s for s in _sources() if s.startswith(prefix)]
 
 
 def rule_id_completer(prefix: str, **kwargs) -> list[str]:
@@ -513,7 +522,7 @@ def _get_completion_parser() -> argparse.ArgumentParser:
     scan_p = subparsers.add_parser("scan", description="Scan history files.")
     scan_source = scan_p.add_argument(
         "--source",
-        choices=list(SOURCES),
+        choices=list(_sources()),
         default=None,
         help="Which agent's history (default: claude-code).",
     )
@@ -562,7 +571,7 @@ def _get_completion_parser() -> argparse.ArgumentParser:
     fix_p = subparsers.add_parser("fix", description="Redact secrets in history.")
     fix_source = fix_p.add_argument(
         "--source",
-        choices=list(SOURCES),
+        choices=list(_sources()),
         default=None,
         help="Which agent's history (default: claude-code).",
     )
@@ -608,7 +617,7 @@ def _get_completion_parser() -> argparse.ArgumentParser:
     undo_p = subparsers.add_parser("undo", description="Restore backups.")
     undo_source = undo_p.add_argument(
         "--source",
-        choices=list(SOURCES),
+        choices=list(_sources()),
         default="claude-code",
         help="Which agent's history.",
     )
@@ -621,7 +630,7 @@ def _get_completion_parser() -> argparse.ArgumentParser:
     purge_p = subparsers.add_parser("purge", description="Delete backups.")
     purge_source = purge_p.add_argument(
         "--source",
-        choices=list(SOURCES),
+        choices=list(_sources()),
         default="claude-code",
         help="Which agent's history.",
     )
