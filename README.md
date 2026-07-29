@@ -13,7 +13,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Offline](https://img.shields.io/badge/runs-fully%20offline-brightgreen.svg)](#)
 [![GitHub Stars](https://img.shields.io/github/stars/Ishannaik/agent-sweep)](https://github.com/Ishannaik/agent-sweep/stargazers)
-[![Discord](https://img.shields.io/discord/1529918028236455967?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/KKvtRhQvRv)
+[![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/KKvtRhQvRv)
 [![Visitors](https://visitor-badge.laobi.icu/badge?page_id=Ishannaik.agent-sweep)](https://github.com/Ishannaik/agent-sweep)
 
 [![AgentSweep demo, scanning and redacting secrets in AI agent history](docs/agentsweep-demo.gif)](https://github.com/Ishannaik/agent-sweep/raw/main/docs/agentsweep-demo.mp4)
