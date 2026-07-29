@@ -13,6 +13,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Offline](https://img.shields.io/badge/runs-fully%20offline-brightgreen.svg)](#)
 [![GitHub Stars](https://img.shields.io/github/stars/Ishannaik/agent-sweep)](https://github.com/Ishannaik/agent-sweep/stargazers)
+[![Discord](https://img.shields.io/discord/1529918028236455967?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/KKvtRhQvRv)
 [![Visitors](https://visitor-badge.laobi.icu/badge?page_id=Ishannaik.agent-sweep)](https://github.com/Ishannaik/agent-sweep)
 
 [![AgentSweep demo, scanning and redacting secrets in AI agent history](docs/agentsweep-demo.gif)](https://github.com/Ishannaik/agent-sweep/raw/main/docs/agentsweep-demo.mp4)
@@ -532,7 +533,7 @@ Every PR also runs GitGuardian and a [bandit](https://bandit.readthedocs.io/) SA
 
 ## Contributors
 
-Thanks to everyone who has contributed code, bug reports, and ideas.
+Thanks to everyone who has contributed code, bug reports, and ideas. Ask questions or get help in the [Discord server](https://discord.gg/KKvtRhQvRv).
 
 [![Contributors](https://readme-contribs.as93.net/contributors/Ishannaik/agent-sweep?shape=circle)](https://github.com/Ishannaik/agent-sweep/graphs/contributors)
 
