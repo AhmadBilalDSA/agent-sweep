@@ -172,6 +172,26 @@ def test_scan_all_detected_includes_both_when_present(_isolate_env, capsys):
     assert sources >= {"claude-code", "codex"}
 
 
+def test_scan_all_exclude_rule_filters_aggregated_findings(_isolate_env, capsys):
+    _seed_claude(
+        _isolate_env,
+        content=(
+            '{"type":"user","message":{"content":[{"type":"text",'
+            f'"text":"key={AWS_KEY} and token {GH_TOKEN}"' + '}]}}\n'
+        ),
+    )
+
+    code, payload, _err = _scan_all_json(
+        extra=["--exclude-rule", "aws-access-key"],
+        capsys=capsys,
+    )
+
+    assert code == 1
+    assert payload
+    assert all(item["source"] == "claude-code" for item in payload)
+    assert {item["rule"] for item in payload} == {"github-pat"}
+
+
 # ---------------------------------------------------------------------------
 # (e) / (f) flag rejection
 # ---------------------------------------------------------------------------

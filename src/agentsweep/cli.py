@@ -271,6 +271,8 @@ def _add_common(ap: argparse.ArgumentParser) -> None:
 
 
 def _parse_run(verb: str, rest: list[str]) -> argparse.Namespace:
+    from .scanner import DETECTOR_IDS, RULES
+
     ap = argparse.ArgumentParser(
         prog=f"agentsweep {verb}",
         description="Find and redact secrets in AI coding agent histories.",
@@ -332,6 +334,20 @@ def _parse_run(verb: str, rest: list[str]) -> argparse.Namespace:
     ap.add_argument(
         "--no-ignore", action="store_true", help="Ignore any .agentsweepignore files."
     )
+    ap.add_argument(
+        "--exclude-rule",
+        action="append",
+        default=[],
+        metavar="RULE_ID",
+        help="Suppress findings from this rule id. Repeatable.",
+    )
+    ap.add_argument(
+        "--only-rule",
+        action="append",
+        default=[],
+        metavar="RULE_ID",
+        help="Keep only findings from this rule id. Repeatable.",
+    )
     # Redaction flags (used by `fix` / legacy --fix; harmless on `scan`).
     ap.add_argument(
         "--no-backup",
@@ -350,6 +366,20 @@ def _parse_run(verb: str, rest: list[str]) -> argparse.Namespace:
     )
     args = ap.parse_args(rest)
     args.fix = verb == "fix"
+
+    if args.exclude_rule and args.only_rule:
+        ap.error("cannot use --exclude-rule with --only-rule")
+
+    all_rule_ids = {rule_id for rule_id, _display, _pattern in RULES} | set(DETECTOR_IDS)
+    unknown = sorted(
+        set(args.exclude_rule).union(args.only_rule).difference(all_rule_ids)
+    )
+    if unknown:
+        joined = ", ".join(unknown)
+        ap.error(f"unknown rule id(s): {joined} (see: agentsweep explain --list)")
+
+    args.exclude_rule = set(args.exclude_rule)
+    args.only_rule = set(args.only_rule)
 
     if args.format is not None:
         if args.json:
@@ -557,6 +587,24 @@ def _get_completion_parser() -> argparse.ArgumentParser:
     scan_p.add_argument(
         "--no-ignore", action="store_true", help="Ignore any .agentsweepignore files."
     )
+    _with_rule_id_completer(
+        scan_p.add_argument(
+            "--exclude-rule",
+            action="append",
+            default=[],
+            metavar="RULE_ID",
+            help="Suppress findings from this rule id. Repeatable.",
+        )
+    )
+    _with_rule_id_completer(
+        scan_p.add_argument(
+            "--only-rule",
+            action="append",
+            default=[],
+            metavar="RULE_ID",
+            help="Keep only findings from this rule id. Repeatable.",
+        )
+    )
     scan_p.add_argument(
         "--no-backup", action="store_true", help="Skip .bak file creation."
     )
@@ -602,6 +650,24 @@ def _get_completion_parser() -> argparse.ArgumentParser:
     )
     fix_p.add_argument(
         "--no-ignore", action="store_true", help="Ignore any .agentsweepignore files."
+    )
+    _with_rule_id_completer(
+        fix_p.add_argument(
+            "--exclude-rule",
+            action="append",
+            default=[],
+            metavar="RULE_ID",
+            help="Suppress findings from this rule id. Repeatable.",
+        )
+    )
+    _with_rule_id_completer(
+        fix_p.add_argument(
+            "--only-rule",
+            action="append",
+            default=[],
+            metavar="RULE_ID",
+            help="Keep only findings from this rule id. Repeatable.",
+        )
     )
     fix_p.add_argument(
         "--no-backup", action="store_true", help="Skip .bak file creation."

@@ -104,8 +104,18 @@ def run(args, *, _findings_out: list | None = None,
     ignores = (ignore_mod.IgnoreSet() if _opt(args, "no_ignore")
                else ignore_mod.load([source.root, Path.cwd()]))
 
+    exclude_rules = set(_opt(args, "exclude_rule", set()))
+    only_rules = _opt(args, "only_rule", None)
+    only_rules = None if not only_rules else set(only_rules)
+
     if machine:
-        found_by_file, _, suppressed, truncated = _scan(source, files, ignores)
+        found_by_file, _, suppressed, truncated = _scan(
+            source,
+            files,
+            ignores,
+            exclude_rules=exclude_rules,
+            only_rules=only_rules,
+        )
         if truncated:
             print(f"warning: {len(truncated)} file(s) exceeded the scan budget "
                   f"and were truncated", file=sys.stderr)
@@ -126,7 +136,13 @@ def run(args, *, _findings_out: list | None = None,
     t0 = time.perf_counter()
     with ui.scan_progress(len(files)) as progress:
         found_by_file, strings_scanned, suppressed, truncated = _scan(
-            source, files, ignores, progress)
+            source,
+            files,
+            ignores,
+            progress,
+            exclude_rules=exclude_rules,
+            only_rules=only_rules,
+        )
     elapsed = time.perf_counter() - t0
 
     ui.stage(2, "ok", "SCAN", f"{len(files)} file(s)",
@@ -306,6 +322,9 @@ def run_all(args) -> int:
     report = getattr(args, "report", False)
     detected_only = bool(_opt(args, "detected", False))
     no_ignore = bool(_opt(args, "no_ignore", False))
+    exclude_rules = set(_opt(args, "exclude_rule", set()))
+    only_rules = _opt(args, "only_rule", None)
+    only_rules = None if not only_rules else set(only_rules)
 
     selected: list[tuple[str, Source]] = []
     experimental: list[str] = []
@@ -470,7 +489,11 @@ def run_all(args) -> int:
                     else ignore_mod.load([source.root, Path.cwd()])
                 )
                 found_by_file, strings_scanned, suppressed, truncated = _scan(
-                    source, files, ignores
+                    source,
+                    files,
+                    ignores,
+                    exclude_rules=exclude_rules,
+                    only_rules=only_rules,
                 )
                 return (
                     key, source, files, found_by_file,
@@ -521,7 +544,12 @@ def run_all(args) -> int:
                             progress.detection(rule_display, masked, location)
 
                 found_by_file, strings_scanned, suppressed, truncated = _scan(
-                    source, files, ignores, _LockedProgress()
+                    source,
+                    files,
+                    ignores,
+                    _LockedProgress(),
+                    exclude_rules=exclude_rules,
+                    only_rules=only_rules,
                 )
                 return (
                     key, source, files, found_by_file,
@@ -756,7 +784,15 @@ def _suggest_paths(missing: Path) -> list[str]:
     return difflib.get_close_matches(missing.name, siblings, n=3, cutoff=0.5)
 
 
-def _scan(source, files, ignores, progress=None):
+def _scan(
+    source,
+    files,
+    ignores,
+    progress=None,
+    *,
+    exclude_rules: set[str] | None = None,
+    only_rules: set[str] | None = None,
+):
     """Scan all files, wiring the progress bar + live detection feed when a
     progress object is supplied. (A multiprocessing path was evaluated and
     dropped — on Windows the spawn + per-worker regex recompile cost gave
@@ -771,8 +807,15 @@ def _scan(source, files, ignores, progress=None):
         if det is not None and fd.file is not None and fd.line is not None:
             det(fd.display, fd.masked, f"{ui.rel(fd.file, source.root)}:{fd.line}")
 
-    return _scan_all(source, files, ignores=ignores,
-                     on_file=_on_file, on_finding=_on_finding)
+    return _scan_all(
+        source,
+        files,
+        ignores=ignores,
+        on_file=_on_file,
+        on_finding=_on_finding,
+        exclude_rules=exclude_rules,
+        only_rules=only_rules,
+    )
 
 
 # A single history file rarely holds more than a few MB of actual conversation
@@ -788,6 +831,9 @@ def _scan_file(
     source: Source,
     f: Path,
     ignores,
+    *,
+    exclude_rules: set[str] | None = None,
+    only_rules: set[str] | None = None,
 ) -> tuple[Path, list[tuple[int, list, str, Finding]], int, int, bool]:
     """Scan a single file; safe to call from a thread pool worker.
 
@@ -797,6 +843,8 @@ def _scan_file(
     them on the main thread after each future completes, so Rich Live is never
     touched from a worker thread.
     """
+    exclude_rules = exclude_rules or set()
+
     items: list[tuple[int, list, str, Finding]] = []
     strings_scanned = 0
     suppressed = 0
@@ -810,6 +858,12 @@ def _scan_file(
             finding.file = f
             finding.line = line_num
             finding.keypath = keypath
+            # --exclude-rule / --only-rule are CLI presentation filters, not
+            # ignore-file suppressions, so they do not increment `suppressed`.
+            if finding.rule in exclude_rules:
+                continue
+            if only_rules is not None and finding.rule not in only_rules:
+                continue
             if ignores:
                 fp = ignore_mod.fingerprint(relpath, line_num, finding.rule)
                 if ignores.matches(finding.rule, finding.value, fp):
@@ -835,6 +889,9 @@ def _scan_all(
     ignores=None,
     on_file=None,
     on_finding=None,
+    *,
+    exclude_rules: set[str] | None = None,
+    only_rules: set[str] | None = None,
 ) -> tuple[dict[Path, list[tuple[int, list, str, Finding]]], int, int, list[Path]]:
     out: dict[Path, list[tuple[int, list, str, Finding]]] = {}
     strings_scanned = 0
@@ -847,7 +904,13 @@ def _scan_all(
         for f in files:
             if on_file is not None:
                 on_file(f)
-            _, items, sc, sup, trunc = _scan_file(source, f, ignores)
+            _, items, sc, sup, trunc = _scan_file(
+                source,
+                f,
+                ignores,
+                exclude_rules=exclude_rules,
+                only_rules=only_rules,
+            )
             strings_scanned += sc
             suppressed += sup
             if trunc:
@@ -861,7 +924,14 @@ def _scan_all(
     workers = min(_SCAN_WORKERS, len(files))
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
-            pool.submit(_scan_file, source, f, ignores): f
+            pool.submit(
+                _scan_file,
+                source,
+                f,
+                ignores,
+                exclude_rules=exclude_rules,
+                only_rules=only_rules,
+            ): f
             for f in files
         }
         for fut in as_completed(futures):
