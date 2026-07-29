@@ -112,6 +112,11 @@ FIXTURES: dict[str, str] = {
     'planetscale-api-token': 'pscale_tkn_a1b2c3a1b2c3' 'a1b2c3a1b2c3a1b2c3a1b2c3',
     'planetscale-oauth-token': 'pscale_oauth_a1b2c3a1b2c' '3a1b2c3a1b2c3a1b2c3a1b2c3',
     'planetscale-password': 'pscale_pw_a1b2c3a1b2c3a' '1b2c3a1b2c3a1b2c3a1b2c3',
+    'posthog-personal-api-key': ''.join((
+        'ph', 'x_',
+        'a2b3c4d5e6f7g8h9jAkBmCnDpEqFrGsHtJuKvMwNx',
+        'PyQzR2xY',
+    )),
     'postman-api-key': 'PMAK-a1b2c3a1b2c3a1b2c3a1b2c3-a1' 'b2c3a1b2c3a1b2c3a1b2c3a1b2c3d4e5',
     'prefect-api-key': 'pnu_a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3',
     'pulumi-access-token': 'pul-a1b2c3a1b2c3a1b2c3' 'a1b2c3a1b2c3a1b2c3d4e5',
