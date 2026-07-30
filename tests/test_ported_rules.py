@@ -112,11 +112,11 @@ FIXTURES: dict[str, str] = {
     'planetscale-api-token': 'pscale_tkn_a1b2c3a1b2c3' 'a1b2c3a1b2c3a1b2c3a1b2c3',
     'planetscale-oauth-token': 'pscale_oauth_a1b2c3a1b2c' '3a1b2c3a1b2c3a1b2c3a1b2c3',
     'planetscale-password': 'pscale_pw_a1b2c3a1b2c3a' '1b2c3a1b2c3a1b2c3a1b2c3',
-    'posthog-personal-api-key': ''.join((
-        'ph', 'x_',
-        'a2b3c4d5e6f7g8h9jAkBmCnDpEqFrGsHtJuKvMwNx',
-        'PyQzR2xY',
-    )),
+    'posthog-personal-api-key': (
+        f"{'ph'}x_"
+        'a2b3c4d5e6f7g8h9jAkBmCnDpEqFrGsHtJuKvMwNx'
+        'PyQzR2x'
+    ),
     'postman-api-key': 'PMAK-a1b2c3a1b2c3a1b2c3a1b2c3-a1' 'b2c3a1b2c3a1b2c3a1b2c3a1b2c3d4e5',
     'prefect-api-key': 'pnu_a1b2c3a1b2c3a1b2' 'c3a1b2c3a1b2c3a1b2c3',
     'pulumi-access-token': 'pul-a1b2c3a1b2c3a1b2c3' 'a1b2c3a1b2c3a1b2c3d4e5',
@@ -248,6 +248,15 @@ def test_rotation_guidance_present_or_cli_default_applies() -> None:
     assert not missing, f"rules lacking guidance: {missing}"
     stale = sorted(set(ROTATION_GUIDANCE) - rule_ids)
     assert not stale, f"guidance for rules that no longer exist: {stale}"
+
+
+@pytest.mark.parametrize("suffix", [
+    'a2b3c4d5e6f7g8h9jAkBmCnDpEqFrGsHtJuKvMwNx' 'PyQzR2x',
+    'a2b3c4d5e6f7g8h9jAkBmCnDpEqFrGsHtJuKvMwNx' 'PyQzR2xY',
+])
+def test_posthog_personal_api_key_detects_real_lengths(suffix: str) -> None:
+    token = f"{'ph'}x_{suffix}"
+    assert any(f.rule == "posthog-personal-api-key" for f in scan_text(token))
 
 
 # Discord bot tokens are a native rule (no gitleaks equivalent), so they live

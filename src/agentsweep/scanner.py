@@ -269,7 +269,7 @@ RULES: list[tuple[str, str, re.Pattern]] = [
     ('planetscale-password', 'PlanetScale database password',
         re.compile('\\bpscale_pw_[\\w=.\\-]{32,64}(?![\\w=.\\-])')),
     ('posthog-personal-api-key', 'PostHog personal API key',
-        re.compile('\\bphx_[2-9A-HJ-NP-Za-km-z]{49}\\b')),
+        re.compile('\\bphx_[2-9A-HJ-NP-Za-km-z]{48,49}\\b')),
     ('postman-api-key', 'Postman API key',
         re.compile('\\bPMAK-[a-fA-F0-9]{24}-[a-fA-F0-9]{34}\\b')),
     ('prefect-api-key', 'Prefect API key',
