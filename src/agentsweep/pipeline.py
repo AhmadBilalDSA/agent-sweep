@@ -165,7 +165,12 @@ def run(args, *, _findings_out: list | None = None,
     if not found_by_file:
         ui.stage(3, "ok", "FINDINGS", "no secrets found")
         if getattr(args, "stats", False):
-            _show_stats(_stats_payload(found_by_file))
+            empty_stats = _stats_payload(found_by_file)
+            if output is not None:
+                _write_text(output, json.dumps(
+                    {"findings": [], "stats": empty_stats}, indent=2) + "\n")
+                print(f"0 finding(s) written to {output}", file=sys.stderr)
+            _show_stats(empty_stats)
         ui.stage(4, "skip", "REDACT", "nothing to redact")
         ui.stage(5, "skip", "ROTATE", "nothing to rotate")
         _warn_leftover_backups(source, as_json=False)
@@ -649,7 +654,12 @@ def run_all(args) -> int:
     if not dirty:
         ui.stage(3, "ok", "FINDINGS", "no secrets found")
         if getattr(args, "stats", False):
-            _show_stats(_stats_payload_multi(per_source))
+            empty_stats = _stats_payload_multi(per_source)
+            if output is not None:
+                _write_text(output, json.dumps(
+                    {"findings": [], "stats": empty_stats}, indent=2) + "\n")
+                print(f"0 finding(s) written to {output}", file=sys.stderr)
+            _show_stats(empty_stats)
         ui.stage(4, "skip", "REDACT", "nothing to redact")
         ui.stage(5, "skip", "ROTATE", "nothing to rotate")
         _warn_leftover_backups_multi([s for _k, s, *_ in per_source],

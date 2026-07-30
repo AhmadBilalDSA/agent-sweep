@@ -97,6 +97,24 @@ def test_scan_human_stats_prints_summary(tmp_path, capsys):
     assert "rule:anthropic" in captured.out
 
 
+def test_scan_clean_stats_writes_output_file(tmp_path, capsys):
+    """--stats -o on a clean scan writes {"findings": [], "stats": ...} to file."""
+    root = tmp_path / "history"
+    root.mkdir()
+    (root / "session.jsonl").write_text('{"type":"user","message":{"content":[]}}\n',
+                                        encoding="utf-8")
+    out_file = tmp_path / "report.json"
+
+    code = main(["scan", "--root", str(root), "--stats", "--output", str(out_file)])
+
+    assert code == 0
+    assert out_file.exists()
+    payload = json.loads(out_file.read_text(encoding="utf-8"))
+    assert payload["findings"] == []
+    assert payload["stats"]["total_findings"] == 0
+    assert payload["stats"]["by_rule"] == {}
+
+
 def test_scan_all_json_stats_include_per_source_counts(_isolated_home, capsys):
     _seed_claude(_isolated_home)
     _seed_codex(_isolated_home)
