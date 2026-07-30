@@ -115,6 +115,47 @@ def test_scan_clean_stats_writes_output_file(tmp_path, capsys):
     assert payload["stats"]["by_rule"] == {}
 
 
+def test_scan_all_clean_stats_writes_output_file(tmp_path, _isolated_home, capsys):
+    """--all --stats -o on a clean multi-source scan writes the zero-stats payload."""
+    _seed_claude(_isolated_home, content='{"type":"user","message":{"content":[]}}\n')
+    _seed_codex(_isolated_home, content='{"type":"message","role":"user","content":""}\n')
+    out_file = tmp_path / "report.json"
+
+    code = main(["scan", "--all", "--stats", "--output", str(out_file)])
+
+    assert code == 0
+    assert out_file.exists()
+    payload = json.loads(out_file.read_text(encoding="utf-8"))
+    assert payload["findings"] == []
+    assert payload["stats"]["total_findings"] == 0
+    assert payload["stats"]["by_rule"] == {}
+    assert payload["stats"]["by_source"] == {}
+
+
+def test_stats_sarif_combination_is_rejected(tmp_path, capsys):
+    """--stats --format sarif must fail with exit code 2 and a clear message."""
+    root = _mkroot(tmp_path)
+
+    code = main(["scan", "--root", str(root), "--stats", "--format", "sarif"])
+    captured = capsys.readouterr()
+
+    assert code == 2
+    assert "--stats" in captured.err
+    assert "SARIF" in captured.err
+
+
+def test_stats_sarif_combination_is_rejected_all(_isolated_home, capsys):
+    """Same rejection applies to scan --all --stats --format sarif."""
+    _seed_claude(_isolated_home)
+
+    code = main(["scan", "--all", "--stats", "--format", "sarif"])
+    captured = capsys.readouterr()
+
+    assert code == 2
+    assert "--stats" in captured.err
+    assert "SARIF" in captured.err
+
+
 def test_scan_all_json_stats_include_per_source_counts(_isolated_home, capsys):
     _seed_claude(_isolated_home)
     _seed_codex(_isolated_home)

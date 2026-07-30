@@ -59,6 +59,10 @@ def run(args, *, _findings_out: list | None = None,
     output: Path | None = _opt(args, "output")
 
     as_sarif = _opt(args, "format") == "sarif"
+    if as_sarif and getattr(args, "stats", False):
+        print("error: --stats is not supported in SARIF mode; "
+              "omit --stats or use --json instead", file=sys.stderr)
+        return 2
     # Both machine formats share every no-banner/no-styling branch below; they
     # differ only in what an empty result set looks like on stdout.
     machine = bool(args.json) or as_sarif
@@ -335,6 +339,10 @@ def run_all(args) -> int:
     """
     output: Path | None = _opt(args, "output")
     as_sarif = _opt(args, "format") == "sarif"
+    if as_sarif and _opt(args, "stats", False):
+        print("error: --stats is not supported in SARIF mode; "
+              "omit --stats or use --json instead", file=sys.stderr)
+        return 2
     as_json = bool(_opt(args, "json", False)) or as_sarif
     report = getattr(args, "report", False)
     detected_only = bool(_opt(args, "detected", False))
