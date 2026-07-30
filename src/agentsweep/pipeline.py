@@ -169,7 +169,7 @@ def run(args, *, _findings_out: list | None = None,
     if not found_by_file:
         ui.stage(3, "ok", "FINDINGS", "no secrets found")
         if getattr(args, "stats", False):
-            empty_stats = _stats_payload(found_by_file)
+            empty_stats = _stats_payload(found_by_file, source_key=source.name)
             if output is not None:
                 _write_text(output, json.dumps(
                     {"findings": [], "stats": empty_stats}, indent=2) + "\n")
@@ -183,7 +183,8 @@ def run(args, *, _findings_out: list | None = None,
 
     total = sum(len(v) for v in found_by_file.values())
     ui.stage(3, "fail", "FINDINGS", f"{total} secret(s) in {len(found_by_file)} file(s)")
-    stats_payload = _stats_payload(found_by_file) if getattr(args, "stats", False) else None
+    stats_payload = (_stats_payload(found_by_file, source_key=source.name)
+                     if getattr(args, "stats", False) else None)
     _show_findings(found_by_file, source, output, stats=stats_payload)
     if stats_payload is not None:
         _show_stats(stats_payload)
@@ -1081,7 +1082,8 @@ def _json_payload(found_by_file: dict, source: Source) -> JsonList:
     return payload
 
 
-def _stats_payload(found_by_file: dict) -> JsonObject:
+def _stats_payload(found_by_file: dict,
+                   source_key: str | None = None) -> JsonObject:
     by_rule: Counter[str] = Counter()
     total = 0
     for items in found_by_file.values():
@@ -1091,6 +1093,7 @@ def _stats_payload(found_by_file: dict) -> JsonObject:
     return {
         "total_findings": total,
         "by_rule": {rule: by_rule[rule] for rule in sorted(by_rule)},
+        "by_source": ({source_key: total} if (source_key and total) else {}),
     }
 
 
@@ -1284,7 +1287,7 @@ def _output_json(
     """Emit JSON output, optionally including a blast-radius report."""
 
     findings = _json_payload(found_by_file, source)
-    stats_payload = _stats_payload(found_by_file) if stats else None
+    stats_payload = _stats_payload(found_by_file, source_key=source.name) if stats else None
 
     if report:
         payload: JsonObject = {

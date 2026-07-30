@@ -81,6 +81,7 @@ def test_scan_json_stats_nests_summary_under_stats(tmp_path, capsys):
         "github-pat": 1,
         "anthropic": 1,
     }
+    assert payload["stats"]["by_source"] == {"claude-code": 3}
 
 
 def test_scan_human_stats_prints_summary(tmp_path, capsys):
@@ -113,6 +114,7 @@ def test_scan_clean_stats_writes_output_file(tmp_path, capsys):
     assert payload["findings"] == []
     assert payload["stats"]["total_findings"] == 0
     assert payload["stats"]["by_rule"] == {}
+    assert payload["stats"]["by_source"] == {}
 
 
 def test_scan_all_clean_stats_writes_output_file(tmp_path, _isolated_home, capsys):
