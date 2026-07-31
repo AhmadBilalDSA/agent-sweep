@@ -107,8 +107,8 @@ class TestIgnoreSetAddLine:
         
     def test_path_prefix_goes_to_globs(self):
         ig = IgnoreSet()
-        ig.add_line("path:**/fixtures/**")
-        assert "**/fixtures/**" in ig.globs
+        ig.add_line("path:*/fixtures/*")
+        assert "*/fixtures/*" in ig.globs
         assert not ig.rules
         assert not ig.fingerprints
         assert not ig.values
@@ -189,12 +189,23 @@ class TestIgnoreSetMatches:
 
     def test_path_glob_matches_relpath(self):
         ig = IgnoreSet()
-        ig.add_line("path:**/fixtures/**")
+        ig.add_line("path:*/fixtures/*")
         assert ig.matches(
             "aws-access-key",
             AWS_KEY,
             "tests/fixtures/sample.jsonl:1:aws-access-key",
             "tests/fixtures/sample.jsonl",
+        )
+        
+    def test_path_glob_does_not_match_other_paths(self):
+        ig = IgnoreSet()
+        ig.add_line("path:*/fixtures/*")
+
+        assert not ig.matches(
+            "aws-access-key",
+            AWS_KEY,
+            "tests/other/sample.jsonl:1:aws-access-key",
+            "tests/other/sample.jsonl",
         )
     
     def test_no_match_returns_false(self):
@@ -328,6 +339,36 @@ class TestFingerprintSuppression:
         assert "1" in err2 and "suppressed" in err2
 
 
+class TestPathGlobSuppression:
+    """path:<pattern> suppresses findings based on their relative file path."""
+
+    def test_path_glob_suppresses_matching_file(self, tmp_path, capsys):
+        root = _mkroot(tmp_path, _AWS_ONLY_LINE)
+        (root / IGNORE_FILENAME).write_text(
+            "path:*.jsonl\n",
+            encoding="utf-8",
+        )
+
+        code, payload, err = _scan_json(root, capsys=capsys)
+
+        assert code == 0
+        assert payload == []
+        assert "1" in err and "suppressed" in err
+
+    def test_path_glob_does_not_suppress_non_matching_file(self, tmp_path, capsys):
+        root = _mkroot(tmp_path, _AWS_ONLY_LINE)
+        (root / IGNORE_FILENAME).write_text(
+            "path:*.txt\n",
+            encoding="utf-8",
+        )
+
+        code, payload, err = _scan_json(root, capsys=capsys)
+
+        assert code == 1
+        assert any(f["rule"] == "aws-access-key" for f in payload)
+        assert "suppressed" not in err
+        
+        
 class TestLiteralValueSuppression:
     """A bare literal value line suppresses any finding whose secret matches."""
 

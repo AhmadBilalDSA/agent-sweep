@@ -4,8 +4,12 @@ Looked up in the scan root and the current directory. Each non-comment
 line is one of:
 
     rule:<rule-id>            ignore every finding from that rule
+    path:<pattern>            ignore findings whose relative path matches
     <relpath>:<line>:<rule>   ignore one exact finding (a "fingerprint")
     <literal>                 ignore any finding whose secret value matches
+
+Path entries use fnmatch patterns, where * can match across path separators
+and ** has no special recursive meaning. For example: path:*/fixtures/*
 
 Fingerprints are what agentsweep prints next to each finding, so the
 copy-paste path is: see a false positive, paste its fingerprint into
