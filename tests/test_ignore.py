@@ -157,6 +157,20 @@ class TestIgnoreSetAddLine:
         ig = IgnoreSet()
         ig.add_line(AWS_KEY)
         assert ig
+        
+    def test_bool_true_when_has_glob(self):
+        ig = IgnoreSet()
+        ig.add_line("path:*/fixtures/*")
+        assert ig
+        
+    def test_file_named_path_is_classified_as_fingerprint(self):
+        ig = IgnoreSet()
+        ig.add_line("path:1:aws-access-key")
+
+        assert "path:1:aws-access-key" in ig.fingerprints
+        assert not ig.globs
+        assert not ig.rules
+        assert not ig.values
 
 
 class TestIgnoreSetMatches:
@@ -195,6 +209,17 @@ class TestIgnoreSetMatches:
             AWS_KEY,
             "tests/fixtures/sample.jsonl:1:aws-access-key",
             "tests/fixtures/sample.jsonl",
+        )
+        
+    def test_path_glob_matches_windows_separators(self):
+        ig = IgnoreSet()
+        ig.add_line("path:*/fixtures/*")
+
+        assert ig.matches(
+            "aws-access-key",
+            AWS_KEY,
+            r"tests\fixtures\sample.jsonl:1:aws-access-key",
+            r"tests\fixtures\sample.jsonl",
         )
         
     def test_path_glob_does_not_match_other_paths(self):

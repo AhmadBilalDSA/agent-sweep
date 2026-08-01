@@ -32,7 +32,7 @@ class IgnoreSet:
         self.rules: set[str] = set()
         self.fingerprints: set[str] = set()
         self.values: set[str] = set()
-        self.globs: list[str] = []
+        self.globs: set[str] = set()
         self.sources: list[Path] = []
 
     def __bool__(self) -> bool:
@@ -42,27 +42,34 @@ class IgnoreSet:
         line = raw.strip()
         if not line or line.startswith("#"):
             return
-        if line.startswith("path:"):
-            glob = line[len("path:"):].strip()
-            if glob:
-                self.globs.append(glob)
-            return
+
         if line.startswith("rule:"):
             self.rules.add(line[len("rule:"):].strip())
             return
+
         # A fingerprint is "<path>:<line>:<rule>" — last segment a rule id,
         # second-to-last an integer line number. Anything else is a literal.
         parts = line.rsplit(":", 2)
         if len(parts) == 3 and parts[1].isdigit():
             self.fingerprints.add(line)
-        else:
-            self.values.add(line)
+            return
 
+        if line.startswith("path:"):
+            glob = line[len("path:"):].strip()
+            if glob:
+                self.globs.add(glob)
+            return
+
+        self.values.add(line)
+        
     def matches(self, rule: str, value: str, fp: str, relpath: str = "") -> bool:
         return (rule in self.rules
                 or fp in self.fingerprints
                 or value in self.values
-                or any(fnmatch.fnmatch(relpath, glob) for glob in self.globs)
+                or any(
+                    fnmatch.fnmatch(relpath.replace("\\", "/"), glob)
+                    for glob in self.globs
+                )
                 )
 
 
