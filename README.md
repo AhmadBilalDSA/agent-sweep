@@ -446,6 +446,34 @@ Copy-paste path: run a scan, copy the fingerprint printed beside the false
 positive, paste it into `.agentsweepignore`, re-scan — it will be gone. Use
 `--no-ignore` to bypass both files when you want a completely fresh pass.
 
+## Config file — persistent default flags
+
+Repeating the same flags on every invocation gets old. agentsweep reads an
+optional config file for four flags that are safe to default silently:
+`source`, `no_color`, `format`, `no_ignore`.
+
+```toml
+# agentsweep.toml (or .agentsweeprc, same format) in the current directory
+source = "codex"
+no_color = true
+format = "sarif"
+no_ignore = false
+```
+
+Lookup order (first file found wins, values are never merged across files):
+
+1. `./agentsweep.toml`
+2. `./.agentsweeprc`
+3. `~/.config/agentsweep/config.toml`
+
+Precedence: **CLI flag > config file > built-in default.** Any flag you pass
+on the command line always overrides the config file.
+
+`--allow-production`, `--force`, and `--no-backup` can **never** be set from
+a config file, even if present in one (agentsweep drops them with a warning)
+— those safety gates must stay explicit on every invocation so a stale or
+shared config file can't silently weaken a redaction safety check.
+
 ## What's NOT detected
 
 - Custom/proprietary secrets without a recognizable prefix.

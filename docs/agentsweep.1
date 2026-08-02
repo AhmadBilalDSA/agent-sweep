@@ -170,6 +170,15 @@ if set).
 .TP
 .I ~/.agentsweep/audit.jsonl
 Append\-only audit log of every write agentsweep performs.
+.TP
+.I ./agentsweep.toml ,\ ./.agentsweeprc ,\ ~/.config/agentsweep/config.toml
+Optional config file for persistent default flags. The first one found
+(in that order) wins; values are never merged across files. Only
+.BR --source ", " --no-color ", " --format ", and " --no-ignore
+may be set this way; CLI flags always override the config file.
+.B --allow-production ,\ --force ,\ and\ --no-backup
+can never be set from a config file, even if present \(em these safety
+gates must stay explicit on every invocation.
 .SH SEE ALSO
 Full documentation, the 193 detection rules, and the safety\-invariant list:
 .UR https://github.com/Ishannaik/agent\-sweep

@@ -217,6 +217,12 @@ def main(argv: list[str] | None = None) -> int:
             return purge(_parse_purge(rest))
 
         args = _parse_run(verb, rest)
+        # Merged in from a config file (--no-color wasn't itself passed): the
+        # earlier apply_no_color() call above only saw raw argv/env, so layer
+        # the config-derived value on top. One-directional, so this is a
+        # no-op if color was already stripped.
+        if args.no_color:
+            ui.apply_no_color(True)
         _background_update_notice(args)
         from .pipeline import run, run_all
         from .menu import offer_redaction
@@ -321,6 +327,7 @@ def _parse_run(verb: str, rest: list[str]) -> argparse.Namespace:
     ap.add_argument(
         "--no-color",
         action="store_true",
+        default=None,
         help="Disable ANSI colors/styling in human output "
         "(also honored via the NO_COLOR env var).",
     )
@@ -332,7 +339,10 @@ def _parse_run(verb: str, rest: list[str]) -> argparse.Namespace:
         "code scanning and SARIF viewers (scan only).",
     )
     ap.add_argument(
-        "--no-ignore", action="store_true", help="Ignore any .agentsweepignore files."
+        "--no-ignore",
+        action="store_true",
+        default=None,
+        help="Ignore any .agentsweepignore files.",
     )
     ap.add_argument(
         "--exclude-rule",
@@ -366,6 +376,26 @@ def _parse_run(verb: str, rest: list[str]) -> argparse.Namespace:
     )
     args = ap.parse_args(rest)
     args.fix = verb == "fix"
+
+    from .config import load_config
+
+    cfg = load_config()
+    if args.source is None and "source" in cfg:
+        args.source = cfg["source"]
+    if args.no_color is None and "no_color" in cfg:
+        args.no_color = cfg["no_color"]
+    if args.format is None and "format" in cfg:
+        args.format = cfg["format"]
+    if args.no_ignore is None and "no_ignore" in cfg:
+        args.no_ignore = cfg["no_ignore"]
+
+    if args.source is not None and args.source not in _sources():
+        ap.error(f"argument --source: invalid choice from config file: {args.source!r}")
+    if args.format is not None and args.format not in ("sarif",):
+        ap.error(f"argument --format: invalid choice from config file: {args.format!r}")
+
+    args.no_color = bool(args.no_color)
+    args.no_ignore = bool(args.no_ignore)
 
     if args.exclude_rule and args.only_rule:
         ap.error("cannot use --exclude-rule with --only-rule")
