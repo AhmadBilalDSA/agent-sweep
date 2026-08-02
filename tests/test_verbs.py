@@ -234,6 +234,17 @@ def test_fix_verb_redact_with_no_placeholder(tmp_path, monkeypatch, capsys):
     "secrets\\{rule}",     # path separator (backslash)
     "{unknown_field}",     # placeholder str.format() can't resolve
     "unbalanced{",         # malformed brace
+    "{rule.foo}",          # attribute access -- naive value.format(rule="x")
+                           # probing wouldn't catch this ("x" has no .foo,
+                           # but a real rule id wouldn't either, and the
+                           # AttributeError would go uncaught mid-parse)
+    "{rule.upper}",        # attribute access on a method that DOES exist on
+                           # str -- would silently pass a naive probe
+    "{rule!r}",            # conversion
+    "{rule:>10}",          # format spec
+    "{0}",                 # positional, not the named "rule" field
+    "",                    # empty -- would silently no-op via `x or default`
+                           # in pipeline.py instead of erasing the secret
 ])
 def test_fix_verb_rejects_broken_redact_template(tmp_path, monkeypatch, bad_template):
     _no_claude(monkeypatch)

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import string
 import sys
 import threading
 from pathlib import Path
@@ -73,10 +74,20 @@ def _validate_redact_template(value: str) -> str:
     or crash mid-redaction, before any scanning starts.
 
     {rule} is optional (the default template uses it, but a fixed string
-    like "[SECRET]" is valid too); anything else in braces is not, since
-    str.format() would raise on it deep inside the write path instead of
-    here at parse time.
+    like "[SECRET]" is valid too). Anything else in braces is not: this
+    parses the template the same way str.format() would (string.Formatter,
+    not a regex) but only allows an exact, bare "rule" field — no
+    conversion (!r), no format spec (:>10), no attribute/index access
+    (.foo, [0]) — since those can raise mid-format (e.g. AttributeError,
+    which plain str.format(rule="x") probing wouldn't always catch: "x"
+    happens to have most of str's own attributes).
     """
+    if not value:
+        # An empty template silently no-ops via `redact_with or REDACT_TEMPLATE`
+        # in pipeline.py, but even if it didn't: an empty replacement erases
+        # all trace that a secret was ever there, defeating the point of a
+        # redaction tool (no marker means no signal anything was scrubbed).
+        raise argparse.ArgumentTypeError("--redact-with must not be empty")
     if "/" in value or "\\" in value:
         raise argparse.ArgumentTypeError(
             "--redact-with must not contain path separators (/ or \\)"
@@ -86,11 +97,19 @@ def _validate_redact_template(value: str) -> str:
             "--redact-with must not contain control characters"
         )
     try:
-        value.format(rule="x")
-    except (KeyError, IndexError, ValueError) as e:
+        fields = list(string.Formatter().parse(value))
+    except ValueError as e:
         raise argparse.ArgumentTypeError(
             f"--redact-with has an invalid {{placeholder}}: {e}"
         ) from e
+    for _literal, field_name, format_spec, conversion in fields:
+        if field_name is None:
+            continue
+        if field_name != "rule" or format_spec or conversion is not None:
+            raise argparse.ArgumentTypeError(
+                "--redact-with only supports a bare {rule} placeholder "
+                "(no conversion, format spec, attribute, or index access)"
+            )
     return value
 
 
