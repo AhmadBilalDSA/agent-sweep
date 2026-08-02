@@ -194,6 +194,62 @@ def test_fix_verb_creates_bak(tmp_path, monkeypatch, capsys):
     assert (root / "session.jsonl.bak").exists()
 
 
+def test_fix_verb_redact_with_custom_template(tmp_path, monkeypatch, capsys):
+    """--redact-with substitutes {rule}; post-write validation still passes."""
+    _no_claude(monkeypatch)
+    root = _seed_root(tmp_path)
+    session = root / "session.jsonl"
+
+    code = main([
+        "fix", "--root", str(root), "--force", "--allow-production",
+        "--redact-with", "<<HIDDEN:{rule}>>",
+    ])
+    assert code == 0
+    content = session.read_text(encoding="utf-8")
+    assert AWS_KEY not in content
+    assert "<<HIDDEN:aws-access-key>>" in content
+    # post-write validation (JSON re-parse, line count) is the real backstop;
+    # a .bak proves safe_write's validate-then-commit path completed.
+    assert (root / "session.jsonl.bak").exists()
+
+
+def test_fix_verb_redact_with_no_placeholder(tmp_path, monkeypatch, capsys):
+    """{rule} is optional -- a template with no placeholder is valid too."""
+    _no_claude(monkeypatch)
+    root = _seed_root(tmp_path)
+    session = root / "session.jsonl"
+
+    code = main([
+        "fix", "--root", str(root), "--force", "--allow-production",
+        "--redact-with", "[SECRET]",
+    ])
+    assert code == 0
+    content = session.read_text(encoding="utf-8")
+    assert AWS_KEY not in content
+    assert "[SECRET]" in content
+
+
+@pytest.mark.parametrize("bad_template", [
+    "../{rule}",           # path separator
+    "secrets\\{rule}",     # path separator (backslash)
+    "{unknown_field}",     # placeholder str.format() can't resolve
+    "unbalanced{",         # malformed brace
+])
+def test_fix_verb_rejects_broken_redact_template(tmp_path, monkeypatch, bad_template):
+    _no_claude(monkeypatch)
+    root = _seed_root(tmp_path)
+    try:
+        main([
+            "fix", "--root", str(root), "--force", "--allow-production",
+            "--redact-with", bad_template,
+        ])
+        raised = False
+    except SystemExit as e:
+        raised = True
+        assert e.code == 2
+    assert raised, f"expected argparse error exit 2 for {bad_template!r}"
+
+
 # ===========================================================================
 # (e) undo --root R
 # ===========================================================================
