@@ -96,6 +96,30 @@ class TestLoadConfig:
         assert config_mod.load_config() == {}
         assert "warning" in capsys.readouterr().err
 
+    def test_string_no_color_is_rejected_not_coerced(self, _isolated_cwd, capsys):
+        # bool("false") is True in Python — a string value must never reach
+        # args.no_color, or it silently inverts the user's intent.
+        _write_project_config(_isolated_cwd, 'no_color = "false"\n')
+        result = config_mod.load_config()
+        assert "no_color" not in result
+        assert "no_color" in capsys.readouterr().err
+
+    def test_string_no_ignore_is_rejected_not_coerced(self, _isolated_cwd, capsys):
+        _write_project_config(_isolated_cwd, 'no_ignore = "false"\n')
+        result = config_mod.load_config()
+        assert "no_ignore" not in result
+        assert "no_ignore" in capsys.readouterr().err
+
+    def test_non_string_source_is_rejected(self, _isolated_cwd, capsys):
+        _write_project_config(_isolated_cwd, "source = 42\n")
+        result = config_mod.load_config()
+        assert "source" not in result
+        assert "source" in capsys.readouterr().err
+
+    def test_valid_bool_no_color_still_applies(self, _isolated_cwd):
+        _write_project_config(_isolated_cwd, "no_color = false\n")
+        assert config_mod.load_config() == {"no_color": False}
+
 
 class TestParseRunMergesConfig:
     def test_source_from_config_applies_when_flag_omitted(self, _isolated_cwd):
@@ -106,6 +130,12 @@ class TestParseRunMergesConfig:
     def test_cli_flag_overrides_config_source(self, _isolated_cwd):
         _write_project_config(_isolated_cwd, 'source = "codex"\n')
         args = _parse_run("scan", ["--source", "claude-code"])
+        assert args.source == "claude-code"
+
+    def test_config_source_does_not_conflict_with_all(self, _isolated_cwd):
+        _write_project_config(_isolated_cwd, 'source = "codex"\n')
+        args = _parse_run("scan", ["--all"])
+        assert args.all is True
         assert args.source == "claude-code"
 
     def test_no_color_from_config(self, _isolated_cwd):

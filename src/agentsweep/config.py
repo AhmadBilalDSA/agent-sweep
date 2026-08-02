@@ -25,6 +25,16 @@ _PROJECT_FILENAMES = ("agentsweep.toml", ".agentsweeprc")
 ALLOWED_KEYS = frozenset({"source", "no_color", "format", "no_ignore"})
 FORBIDDEN_KEYS = frozenset({"allow_production", "force", "no_backup"})
 
+# Expected TOML type per allowed key. A value of the wrong type (e.g.
+# no_color = "false", a truthy non-empty string) is dropped with a warning
+# rather than silently coerced — bool("false") is True in Python.
+_EXPECTED_TYPES: dict[str, type] = {
+    "source": str,
+    "no_color": bool,
+    "format": str,
+    "no_ignore": bool,
+}
+
 
 def _user_config_path() -> Path:
     # Resolved lazily (not at import time) so tests can monkeypatch
@@ -71,4 +81,18 @@ def load_config() -> dict:
             file=sys.stderr,
         )
 
-    return {key: data[key] for key in ALLOWED_KEYS if key in data}
+    result = {}
+    for key in ALLOWED_KEYS:
+        if key not in data:
+            continue
+        value = data[key]
+        expected = _EXPECTED_TYPES[key]
+        if not isinstance(value, expected):
+            print(
+                f"agentsweep: warning: {path} sets {key} = {value!r}, expected "
+                f"a {expected.__name__}; ignoring this key.",
+                file=sys.stderr,
+            )
+            continue
+        result[key] = value
+    return result

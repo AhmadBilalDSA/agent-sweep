@@ -380,7 +380,7 @@ def _parse_run(verb: str, rest: list[str]) -> argparse.Namespace:
     from .config import load_config
 
     cfg = load_config()
-    if args.source is None and "source" in cfg:
+    if args.source is None and "source" in cfg and not args.all:
         args.source = cfg["source"]
     if args.no_color is None and "no_color" in cfg:
         args.no_color = cfg["no_color"]
