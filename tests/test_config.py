@@ -157,6 +157,26 @@ class TestParseRunMergesConfig:
         args = _parse_run("scan", [])
         assert args.format == "sarif"
 
+    def test_config_format_does_not_conflict_with_fix(self, _isolated_cwd):
+        _write_project_config(_isolated_cwd, 'format = "sarif"\n')
+        args = _parse_run("fix", [])
+        assert args.fix is True
+        assert args.format is None
+
+    def test_config_format_does_not_conflict_with_json(self, _isolated_cwd):
+        _write_project_config(_isolated_cwd, 'format = "sarif"\n')
+        args = _parse_run("scan", ["--json"])
+        assert args.json is True
+        assert args.format is None
+
+    def test_config_format_does_not_conflict_with_report(self, _isolated_cwd):
+        _write_project_config(_isolated_cwd, 'format = "sarif"\n')
+        args = _parse_run("scan", ["--report"])
+        assert args.report is True
+        assert args.format is None
+        # --report always implies JSON output regardless of the config file.
+        assert args.json is True
+
     def test_invalid_source_in_config_errors(self, _isolated_cwd):
         _write_project_config(_isolated_cwd, 'source = "not-a-real-source"\n')
         with pytest.raises(SystemExit):

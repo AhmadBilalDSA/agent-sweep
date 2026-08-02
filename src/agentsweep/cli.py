@@ -384,7 +384,13 @@ def _parse_run(verb: str, rest: list[str]) -> argparse.Namespace:
         args.source = cfg["source"]
     if args.no_color is None and "no_color" in cfg:
         args.no_color = cfg["no_color"]
-    if args.format is None and "format" in cfg:
+    if (
+        args.format is None
+        and "format" in cfg
+        and verb != "fix"
+        and not args.json
+        and not args.report
+    ):
         args.format = cfg["format"]
     if args.no_ignore is None and "no_ignore" in cfg:
         args.no_ignore = cfg["no_ignore"]

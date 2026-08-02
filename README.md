@@ -449,8 +449,15 @@ positive, paste it into `.agentsweepignore`, re-scan — it will be gone. Use
 ## Config file — persistent default flags
 
 Repeating the same flags on every invocation gets old. agentsweep reads an
-optional config file for four flags that are safe to default silently:
-`source`, `no_color`, `format`, `no_ignore`.
+optional config file for four flags that are safe to default silently. TOML
+keys drop the CLI flag's leading `--` and use underscores instead of hyphens:
+
+| CLI flag | TOML key |
+| --- | --- |
+| `--source` | `source` |
+| `--no-color` | `no_color` |
+| `--format` | `format` |
+| `--no-ignore` | `no_ignore` |
 
 ```toml
 # agentsweep.toml (or .agentsweeprc, same format) in the current directory
@@ -466,8 +473,12 @@ Lookup order (first file found wins, values are never merged across files):
 2. `./.agentsweeprc`
 3. `~/.config/agentsweep/config.toml`
 
-Precedence: **CLI flag > config file > built-in default.** Any flag you pass
-on the command line always overrides the config file.
+Precedence: **CLI flag > config file > built-in default, applied per option.**
+A flag you pass on the command line always overrides the config file's value
+for *that same option* — it does not clear other configured options. A
+configured `format = "sarif"` is skipped entirely (not merged, not erroring)
+on `fix`, `--json`, or `--report` invocations, since those are incompatible
+with SARIF output; it only ever applies to a plain `scan`.
 
 `--allow-production`, `--force`, and `--no-backup` can **never** be set from
 a config file, even if present in one (agentsweep drops them with a warning)
