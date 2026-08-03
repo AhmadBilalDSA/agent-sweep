@@ -89,6 +89,8 @@ def _background_update_notice(args: argparse.Namespace) -> None:
             return
         if getattr(args, "json", False):
             return
+        if getattr(args, "format", None):
+            return
         if not sys.stdout.isatty():
             return
     except Exception:
@@ -333,16 +335,24 @@ def _parse_run(verb: str, rest: list[str]) -> argparse.Namespace:
     )
     ap.add_argument(
         "--format",
-        choices=["sarif"],
+        choices=["sarif", "human"],
         help="Emit findings in an interchange format instead of "
         "the default report: sarif = SARIF 2.1.0 for GitHub "
-        "code scanning and SARIF viewers (scan only).",
+        "code scanning and SARIF viewers (scan only). Pass "
+        "'human' to force the default report even when a "
+        "config file sets format = \"sarif\".",
     )
     ap.add_argument(
         "--no-ignore",
         action="store_true",
         default=None,
         help="Ignore any .agentsweepignore files.",
+    )
+    ap.add_argument(
+        "--ignore",
+        action="store_true",
+        help="Force .agentsweepignore suppression on, even if a "
+        "config file sets no_ignore = true.",
     )
     ap.add_argument(
         "--exclude-rule",
@@ -397,11 +407,22 @@ def _parse_run(verb: str, rest: list[str]) -> argparse.Namespace:
 
     if args.source is not None and args.source not in _sources():
         ap.error(f"argument --source: invalid choice from config file: {args.source!r}")
-    if args.format is not None and args.format not in ("sarif",):
+    if args.format is not None and args.format not in ("sarif", "human"):
         ap.error(f"argument --format: invalid choice from config file: {args.format!r}")
+
+    # "human" is a CLI-only override that forces the default report even when
+    # a config file sets format = "sarif" — resolve it to the same "no format"
+    # state as never having set one, before it reaches any downstream check.
+    if args.format == "human":
+        args.format = None
 
     args.no_color = bool(args.no_color)
     args.no_ignore = bool(args.no_ignore)
+    # --ignore is the CLI-only override for a config file's no_ignore = true —
+    # the config-set flags need a way back to the built-in default, same as
+    # --format human does for a config-set format.
+    if getattr(args, "ignore", False):
+        args.no_ignore = False
 
     if args.exclude_rule and args.only_rule:
         ap.error("cannot use --exclude-rule with --only-rule")

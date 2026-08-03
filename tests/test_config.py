@@ -9,6 +9,8 @@ Covers:
 """
 from __future__ import annotations
 
+import argparse
+import json as json_mod
 import sys
 from pathlib import Path
 
@@ -16,6 +18,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from agentsweep import cli  # noqa: E402
 from agentsweep import config as config_mod  # noqa: E402
 from agentsweep.cli import _parse_run  # noqa: E402
 
@@ -116,6 +119,18 @@ class TestLoadConfig:
         assert "source" not in result
         assert "source" in capsys.readouterr().err
 
+    def test_type_mismatch_warning_never_echoes_the_value(self, _isolated_cwd, capsys):
+        # agentsweep redacts secrets; a mistyped config line must not get its
+        # content printed to stderr on every run. no_color expects a bool, so
+        # a string value here triggers the type-mismatch warning path.
+        secret_looking_value = "AKIAIOSFODNN7EXAMPLE"
+        _write_project_config(_isolated_cwd, f'no_color = "{secret_looking_value}"\n')
+        config_mod.load_config()
+        err = capsys.readouterr().err
+        assert secret_looking_value not in err
+        assert "no_color" in err
+        assert "str" in err
+
     def test_valid_bool_no_color_still_applies(self, _isolated_cwd):
         _write_project_config(_isolated_cwd, "no_color = false\n")
         assert config_mod.load_config() == {"no_color": False}
@@ -152,6 +167,14 @@ class TestParseRunMergesConfig:
         args = _parse_run("scan", [])
         assert args.no_ignore is True
 
+    def test_ignore_flag_overrides_config_no_ignore(self, _isolated_cwd):
+        # no_ignore=true in config is otherwise a one-way door with no CLI
+        # route back to the built-in default (there's no bare --ignore-less
+        # way to force it False) — --ignore is that route.
+        _write_project_config(_isolated_cwd, "no_ignore = true\n")
+        args = _parse_run("scan", ["--ignore"])
+        assert args.no_ignore is False
+
     def test_format_from_config(self, _isolated_cwd):
         _write_project_config(_isolated_cwd, 'format = "sarif"\n')
         args = _parse_run("scan", [])
@@ -177,6 +200,14 @@ class TestParseRunMergesConfig:
         # --report always implies JSON output regardless of the config file.
         assert args.json is True
 
+    def test_format_human_overrides_config_sarif(self, _isolated_cwd):
+        # format="sarif" in config is otherwise a one-way door: choices are
+        # ["sarif"] only downstream, so there was no CLI route back to the
+        # human report on a plain `scan`. --format human is that route.
+        _write_project_config(_isolated_cwd, 'format = "sarif"\n')
+        args = _parse_run("scan", ["--format", "human"])
+        assert args.format is None
+
     def test_invalid_source_in_config_errors(self, _isolated_cwd):
         _write_project_config(_isolated_cwd, 'source = "not-a-real-source"\n')
         with pytest.raises(SystemExit):
@@ -191,3 +222,32 @@ class TestParseRunMergesConfig:
         assert args.allow_production is False
         assert args.force is False
         assert args.no_backup is False
+
+
+class TestUpdateNoticeSkipsConfigSarif:
+    """format="sarif" is machine-readable output just like --json, and the
+    update-available banner must not get interleaved into it on a tty run
+    where the user never passed --json."""
+
+    def test_update_notice_skipped_when_format_is_sarif(self, monkeypatch, capsys):
+        import urllib.request
+
+        class _FakeResp:
+            def read(self):
+                return json_mod.dumps({"info": {"version": "99.0.0"}}).encode()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        monkeypatch.delenv("AGENTSWEEP_NO_UPDATE", raising=False)
+        monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+        monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: _FakeResp())
+
+        args = argparse.Namespace(json=False, format="sarif")
+        cli._background_update_notice(args)
+        out = capsys.readouterr().out
+
+        assert "agentsweep 99.0.0 available" not in out

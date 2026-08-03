@@ -89,8 +89,9 @@ def load_config() -> dict:
         expected = _EXPECTED_TYPES[key]
         if not isinstance(value, expected):
             print(
-                f"agentsweep: warning: {path} sets {key} = {value!r}, expected "
-                f"a {expected.__name__}; ignoring this key.",
+                f"agentsweep: warning: {path} sets {key} to a "
+                f"{type(value).__name__}, expected a {expected.__name__}; "
+                "ignoring this key.",
                 file=sys.stderr,
             )
             continue
