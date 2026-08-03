@@ -104,11 +104,19 @@ def run(args, *, _findings_out: list | None = None,
         files = list(source.iter_files())
     if not files:
         print(f"No history files found under {source.root}", file=sys.stderr)
+        stats_flag = getattr(args, "stats", False)
         if machine:
-            _print_empty_machine_output()
+            if args.json and stats_flag:
+                empty_stats = _stats_payload({}, source_key=source.name)
+                _emit_json_payload(
+                    {"findings": [], "stats": empty_stats}, output, 0)
+            else:
+                _print_empty_machine_output()
         else:
             ui.stage(1, "warn", "DISCOVER", source.name,
                      f"no history files under {source.root}", err=True)
+            if stats_flag:
+                _show_stats(_stats_payload({}, source_key=source.name))
         return 0
 
     ignores = (ignore_mod.IgnoreSet() if _opt(args, "no_ignore")
@@ -369,11 +377,19 @@ def run_all(args) -> int:
         msg = ("no agent history roots found on this machine"
                if detected_only else "no sources available to scan")
         print(msg, file=sys.stderr)
+        stats_flag = _opt(args, "stats", False)
         if as_json:
-            print("[]")
+            if stats_flag:
+                _emit_json_payload(
+                    {"findings": [], "stats": _stats_payload_multi([])},
+                    output, 0)
+            else:
+                print("[]")
         else:
             ui.banner(__version__)
             ui.warn_line(msg)
+            if stats_flag:
+                _show_stats(_stats_payload_multi([]))
         return 0
 
     if not as_json:
@@ -460,13 +476,21 @@ def run_all(args) -> int:
 
     if total_files == 0:
         print("No history files found under any selected source", file=sys.stderr)
+        stats_flag = _opt(args, "stats", False)
         if as_json:
-            print("[]")
+            if stats_flag:
+                _emit_json_payload(
+                    {"findings": [], "stats": _stats_payload_multi([])},
+                    output, 0)
+            else:
+                print("[]")
         else:
             ui.stage(1, "warn", "DISCOVER", f"{len(selected)} source(s)",
                      "no history files", err=True)
             ui.stage(2, "skip", "SCAN", "nothing to scan")
             ui.stage(3, "ok", "FINDINGS", "no secrets found")
+            if stats_flag:
+                _show_stats(_stats_payload_multi([]))
             ui.stage(4, "skip", "REDACT", "nothing to redact")
             ui.stage(5, "skip", "ROTATE", "nothing to rotate")
             ui.contribute_line()

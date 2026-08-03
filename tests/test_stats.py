@@ -93,9 +93,26 @@ def test_scan_human_stats_prints_summary(tmp_path, capsys):
     assert code == 1
     assert "Stats" in captured.out
     assert "total findings: 3" in captured.out
-    assert "rule:aws-access-key" in captured.out
-    assert "rule:github-pat" in captured.out
-    assert "rule:anthropic" in captured.out
+    assert "rule:aws-access-key  1" in captured.out
+    assert "rule:github-pat  1" in captured.out
+    assert "rule:anthropic  1" in captured.out
+    assert "source:claude-code  3" in captured.out
+
+
+def test_scan_empty_discovery_json_stats(tmp_path, capsys):
+    """--json --stats on an empty root emits the standard stats object, not []."""
+    root = tmp_path / "empty"
+    root.mkdir()
+
+    code = main(["scan", "--root", str(root), "--json", "--stats"])
+    captured = capsys.readouterr()
+
+    assert code == 0
+    payload = json.loads(captured.out)
+    assert payload["findings"] == []
+    assert payload["stats"]["total_findings"] == 0
+    assert payload["stats"]["by_rule"] == {}
+    assert payload["stats"]["by_source"] == {}
 
 
 def test_scan_clean_stats_writes_output_file(tmp_path, capsys):
