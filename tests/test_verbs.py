@@ -245,10 +245,18 @@ def test_fix_verb_redact_with_no_placeholder(tmp_path, monkeypatch, capsys):
     "{0}",                 # positional, not the named "rule" field
     "",                    # empty -- would silently no-op via `x or default`
                            # in pipeline.py instead of erasing the secret
+    chr(0x85),             # U+0085 NEL -- >= 0x20 so the plain control-char
+                           # check wouldn't catch it, but str.splitlines()
+                           # treats it as a line break and would corrupt a
+                           # JSON/JSONL write mid-redaction
+    chr(0x2028),           # U+2028 LINE SEPARATOR -- same class of bug
+    chr(0x2029),           # U+2029 PARAGRAPH SEPARATOR -- same class of bug
 ])
 def test_fix_verb_rejects_broken_redact_template(tmp_path, monkeypatch, bad_template):
     _no_claude(monkeypatch)
     root = _seed_root(tmp_path)
+    session = root / "session.jsonl"
+    original_content = session.read_text(encoding="utf-8")
     try:
         main([
             "fix", "--root", str(root), "--force", "--allow-production",
@@ -259,6 +267,12 @@ def test_fix_verb_rejects_broken_redact_template(tmp_path, monkeypatch, bad_temp
         raised = True
         assert e.code == 2
     assert raised, f"expected argparse error exit 2 for {bad_template!r}"
+    # The whole point of rejecting before scanning is that nothing gets
+    # written: the secret must still be on disk, untouched, and no .bak
+    # should exist (safe_write must never have run).
+    assert session.read_text(encoding="utf-8") == original_content
+    assert AWS_KEY in session.read_text(encoding="utf-8")
+    assert not (root / "session.jsonl.bak").exists()
 
 
 # ===========================================================================

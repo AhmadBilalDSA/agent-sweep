@@ -92,9 +92,20 @@ def _validate_redact_template(value: str) -> str:
         raise argparse.ArgumentTypeError(
             "--redact-with must not contain path separators (/ or \\)"
         )
-    if any(ord(c) < 0x20 or ord(c) == 0x7F for c in value):
+    # U+0085 (NEL), U+2028 (LINE SEPARATOR), and U+2029 (PARAGRAPH SEPARATOR)
+    # are >= 0x20 so the control-character check above doesn't catch them,
+    # but str.splitlines() treats all three as line breaks and
+    # json.dumps(..., ensure_ascii=False) writes them through raw — one of
+    # these in the template silently turns one JSON value into two lines,
+    # which fails safe_write's post-write line-count validation and aborts
+    # the redaction after the secret has already been found (but not fixed).
+    _EXTRA_LINE_BREAK_CODEPOINTS = (0x85, 0x2028, 0x2029)
+    if any(
+        ord(c) < 0x20 or ord(c) == 0x7F or ord(c) in _EXTRA_LINE_BREAK_CODEPOINTS
+        for c in value
+    ):
         raise argparse.ArgumentTypeError(
-            "--redact-with must not contain control characters"
+            "--redact-with must not contain control or line-breaking characters"
         )
     try:
         fields = list(string.Formatter().parse(value))
