@@ -170,6 +170,30 @@ if set).
 .TP
 .I ~/.agentsweep/audit.jsonl
 Append\-only audit log of every write agentsweep performs.
+.TP
+.I ./agentsweep.toml ,\ ./.agentsweeprc ,\ ~/.config/agentsweep/config.toml
+Optional config file for persistent default flags. The first one found
+(in that order) wins; values are never merged across files. Only
+.BR --source ", " --no-color ", " --format ", and " --no-ignore
+may be set this way, as the TOML keys
+.BR source ", " no_color ", " format ", and " no_ignore
+respectively (drop the flag's leading
+.B --
+and use an underscore in place of the hyphen). A CLI flag always overrides
+the config file's value for that same option, per invocation \(em it does
+not clear other configured options. A configured
+.B format\ =\ \(dqsarif\(dq
+is skipped (not merged, not an error) on
+.BR fix ,
+.BR --json ,
+or
+.B --report
+invocations, since SARIF is incompatible with those; it only ever applies
+to a plain
+.BR scan .
+.B --allow-production ,\ --force ,\ and\ --no-backup
+can never be set from a config file, even if present \(em these safety
+gates must stay explicit on every invocation.
 .SH SEE ALSO
 Full documentation, the 193 detection rules, and the safety\-invariant list:
 .UR https://github.com/Ishannaik/agent\-sweep
