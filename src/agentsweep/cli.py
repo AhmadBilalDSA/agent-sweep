@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import string
 import sys
 import threading
 from pathlib import Path
@@ -66,6 +67,61 @@ def _version_tuple(v: str) -> tuple[int, ...]:
         return tuple(int(x) for x in v.split(".") if x.isdigit())
     except Exception:
         return (0,)
+
+
+def _validate_redact_template(value: str) -> str:
+    """Reject a --redact-with template that would corrupt the written file
+    or crash mid-redaction, before any scanning starts.
+
+    {rule} is optional (the default template uses it, but a fixed string
+    like "[SECRET]" is valid too). Anything else in braces is not: this
+    parses the template the same way str.format() would (string.Formatter,
+    not a regex) but only allows an exact, bare "rule" field — no
+    conversion (!r), no format spec (:>10), no attribute/index access
+    (.foo, [0]) — since those can raise mid-format (e.g. AttributeError,
+    which plain str.format(rule="x") probing wouldn't always catch: "x"
+    happens to have most of str's own attributes).
+    """
+    if not value:
+        # An empty template silently no-ops via `redact_with or REDACT_TEMPLATE`
+        # in pipeline.py, but even if it didn't: an empty replacement erases
+        # all trace that a secret was ever there, defeating the point of a
+        # redaction tool (no marker means no signal anything was scrubbed).
+        raise argparse.ArgumentTypeError("--redact-with must not be empty")
+    if "/" in value or "\\" in value:
+        raise argparse.ArgumentTypeError(
+            "--redact-with must not contain path separators (/ or \\)"
+        )
+    # U+0085 (NEL), U+2028 (LINE SEPARATOR), and U+2029 (PARAGRAPH SEPARATOR)
+    # are >= 0x20 so the control-character check above doesn't catch them,
+    # but str.splitlines() treats all three as line breaks and
+    # json.dumps(..., ensure_ascii=False) writes them through raw — one of
+    # these in the template silently turns one JSON value into two lines,
+    # which fails safe_write's post-write line-count validation and aborts
+    # the redaction after the secret has already been found (but not fixed).
+    _EXTRA_LINE_BREAK_CODEPOINTS = (0x85, 0x2028, 0x2029)
+    if any(
+        ord(c) < 0x20 or ord(c) == 0x7F or ord(c) in _EXTRA_LINE_BREAK_CODEPOINTS
+        for c in value
+    ):
+        raise argparse.ArgumentTypeError(
+            "--redact-with must not contain control or line-breaking characters"
+        )
+    try:
+        fields = list(string.Formatter().parse(value))
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(
+            f"--redact-with has an invalid {{placeholder}}: {e}"
+        ) from e
+    for _literal, field_name, format_spec, conversion in fields:
+        if field_name is None:
+            continue
+        if field_name != "rule" or format_spec or conversion is not None:
+            raise argparse.ArgumentTypeError(
+                "--redact-with only supports a bare {rule} placeholder "
+                "(no conversion, format spec, attribute, or index access)"
+            )
+    return value
 
 
 def _background_update_notice(args: argparse.Namespace) -> None:
@@ -369,6 +425,14 @@ def _parse_run(verb: str, rest: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Allow --fix against the default production root.",
     )
+    ap.add_argument(
+        "--redact-with",
+        type=_validate_redact_template,
+        default=None,
+        metavar="TEMPLATE",
+        help="Custom placeholder for redacted secrets, e.g. '[SECRET]'. "
+        "{rule} is substituted if present. Default: [REDACTED:{rule}]",
+    )
     args = ap.parse_args(rest)
     args.fix = verb == "fix"
 
@@ -624,6 +688,14 @@ def _get_completion_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Allow against default production root.",
     )
+    scan_p.add_argument(
+        "--redact-with",
+        type=_validate_redact_template,
+        default=None,
+        metavar="TEMPLATE",
+        help="Custom placeholder for redacted secrets, e.g. '[SECRET]'. "
+        "{rule} is substituted if present. Default: [REDACTED:{rule}]",
+    )
 
     # fix
     fix_p = subparsers.add_parser("fix", description="Redact secrets in history.")
@@ -692,6 +764,14 @@ def _get_completion_parser() -> argparse.ArgumentParser:
         "--allow-production",
         action="store_true",
         help="Allow against default production root.",
+    )
+    fix_p.add_argument(
+        "--redact-with",
+        type=_validate_redact_template,
+        default=None,
+        metavar="TEMPLATE",
+        help="Custom placeholder for redacted secrets, e.g. '[SECRET]'. "
+        "{rule} is substituted if present. Default: [REDACTED:{rule}]",
     )
 
     # undo

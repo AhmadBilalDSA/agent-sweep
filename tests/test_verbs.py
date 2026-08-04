@@ -194,6 +194,87 @@ def test_fix_verb_creates_bak(tmp_path, monkeypatch, capsys):
     assert (root / "session.jsonl.bak").exists()
 
 
+def test_fix_verb_redact_with_custom_template(tmp_path, monkeypatch, capsys):
+    """--redact-with substitutes {rule}; post-write validation still passes."""
+    _no_claude(monkeypatch)
+    root = _seed_root(tmp_path)
+    session = root / "session.jsonl"
+
+    code = main([
+        "fix", "--root", str(root), "--force", "--allow-production",
+        "--redact-with", "<<HIDDEN:{rule}>>",
+    ])
+    assert code == 0
+    content = session.read_text(encoding="utf-8")
+    assert AWS_KEY not in content
+    assert "<<HIDDEN:aws-access-key>>" in content
+    # post-write validation (JSON re-parse, line count) is the real backstop;
+    # a .bak proves safe_write's validate-then-commit path completed.
+    assert (root / "session.jsonl.bak").exists()
+
+
+def test_fix_verb_redact_with_no_placeholder(tmp_path, monkeypatch, capsys):
+    """{rule} is optional -- a template with no placeholder is valid too."""
+    _no_claude(monkeypatch)
+    root = _seed_root(tmp_path)
+    session = root / "session.jsonl"
+
+    code = main([
+        "fix", "--root", str(root), "--force", "--allow-production",
+        "--redact-with", "[SECRET]",
+    ])
+    assert code == 0
+    content = session.read_text(encoding="utf-8")
+    assert AWS_KEY not in content
+    assert "[SECRET]" in content
+
+
+@pytest.mark.parametrize("bad_template", [
+    "../{rule}",           # path separator
+    "secrets\\{rule}",     # path separator (backslash)
+    "{unknown_field}",     # placeholder str.format() can't resolve
+    "unbalanced{",         # malformed brace
+    "{rule.foo}",          # attribute access -- naive value.format(rule="x")
+                           # probing wouldn't catch this ("x" has no .foo,
+                           # but a real rule id wouldn't either, and the
+                           # AttributeError would go uncaught mid-parse)
+    "{rule.upper}",        # attribute access on a method that DOES exist on
+                           # str -- would silently pass a naive probe
+    "{rule!r}",            # conversion
+    "{rule:>10}",          # format spec
+    "{0}",                 # positional, not the named "rule" field
+    "",                    # empty -- would silently no-op via `x or default`
+                           # in pipeline.py instead of erasing the secret
+    chr(0x85),             # U+0085 NEL -- >= 0x20 so the plain control-char
+                           # check wouldn't catch it, but str.splitlines()
+                           # treats it as a line break and would corrupt a
+                           # JSON/JSONL write mid-redaction
+    chr(0x2028),           # U+2028 LINE SEPARATOR -- same class of bug
+    chr(0x2029),           # U+2029 PARAGRAPH SEPARATOR -- same class of bug
+])
+def test_fix_verb_rejects_broken_redact_template(tmp_path, monkeypatch, bad_template):
+    _no_claude(monkeypatch)
+    root = _seed_root(tmp_path)
+    session = root / "session.jsonl"
+    original_content = session.read_text(encoding="utf-8")
+    try:
+        main([
+            "fix", "--root", str(root), "--force", "--allow-production",
+            "--redact-with", bad_template,
+        ])
+        raised = False
+    except SystemExit as e:
+        raised = True
+        assert e.code == 2
+    assert raised, f"expected argparse error exit 2 for {bad_template!r}"
+    # The whole point of rejecting before scanning is that nothing gets
+    # written: the secret must still be on disk, untouched, and no .bak
+    # should exist (safe_write must never have run).
+    assert session.read_text(encoding="utf-8") == original_content
+    assert AWS_KEY in session.read_text(encoding="utf-8")
+    assert not (root / "session.jsonl.bak").exists()
+
+
 # ===========================================================================
 # (e) undo --root R
 # ===========================================================================

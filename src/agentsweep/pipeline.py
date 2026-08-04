@@ -223,6 +223,7 @@ def run(args, *, _findings_out: list | None = None,
         found_by_file=found_by_file,
         backup=not args.no_backup,
         force=args.force,
+        template=_opt(args, "redact_with", None) or REDACT_TEMPLATE,
     )
     if _force_recoverable_out is not None:
         _force_recoverable_out.append(recoverable)
@@ -280,6 +281,7 @@ def redact_findings(args, source: Source, found_by_file: dict, *,
         found_by_file=found_by_file,
         backup=not args.no_backup,
         force=args.force,
+        template=_opt(args, "redact_with", None) or REDACT_TEMPLATE,
     )
     if _force_recoverable_out is not None:
         _force_recoverable_out.append(recoverable)
@@ -829,6 +831,7 @@ def _fix_all_sources(args, dirty: list[tuple[str, Source, dict]]) -> int:
             found_by_file=found_by_file,
             backup=not args.no_backup,
             force=args.force,
+            template=_opt(args, "redact_with", None) or REDACT_TEMPLATE,
         )
         for status, path_display, note in rows:
             ui.redact_row(status, f"{key}: {path_display}", note)
@@ -1564,6 +1567,7 @@ def _redact_all(
     found_by_file: dict,
     backup: bool,
     force: bool,
+    template: str = REDACT_TEMPLATE,
 ) -> tuple[list[tuple[str, str, str]], int, bool]:
     """Apply redactions, returning (rows, error_count, force_recoverable).
 
@@ -1586,7 +1590,7 @@ def _redact_all(
             recoverable = recoverable or e.force_recoverable
             continue
 
-        redactions = _build_redactions(items)
+        redactions = _build_redactions(items, template)
         try:
             new_content = source.apply_redactions(path, redactions)
             record = safe_write(path, new_content, backup=backup,
@@ -1647,7 +1651,10 @@ def _preflight_gates(source: Source, source_cls: type[Source],
     return None, False
 
 
-def _build_redactions(items: list[tuple[int, list, str, Finding]]) -> list[tuple[int, list, str]]:
+def _build_redactions(
+    items: list[tuple[int, list, str, Finding]],
+    template: str = REDACT_TEMPLATE,
+) -> list[tuple[int, list, str]]:
     # Group findings by the (line, keypath) pair so multiple secrets inside one
     # string are applied in a single rewrite.
     by_loc: dict[tuple[int, tuple], tuple[str, list[Finding]]] = {}
@@ -1663,6 +1670,6 @@ def _build_redactions(items: list[tuple[int, list, str, Finding]]) -> list[tuple
         # Replace right-to-left so earlier spans' offsets stay valid.
         for fd in sorted(findings, key=lambda x: x.span[0], reverse=True):
             start, end = fd.span
-            new_val = new_val[:start] + REDACT_TEMPLATE.format(rule=fd.rule) + new_val[end:]
+            new_val = new_val[:start] + template.format(rule=fd.rule) + new_val[end:]
         redactions.append((line_num, list(kp_tuple), new_val))
     return redactions

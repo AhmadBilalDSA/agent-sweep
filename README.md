@@ -359,6 +359,11 @@ agentsweep fix --allow-production --no-backup
 # Bypass soft safety checks: mtime gate (files modified <60 s ago) and running-process gate
 agentsweep fix --allow-production --force
 
+# Customize the redaction placeholder (default: [REDACTED:{rule}]); {rule} is
+# optional. Rejected up front if it contains a path separator or a control
+# character, or if {rule} substitution would fail.
+agentsweep fix --allow-production --redact-with "***{rule}***"
+
 # Combine: non-interactive JSON-mode redaction against a custom root
 agentsweep fix --root ~/history-copy --json
 ```
