@@ -319,6 +319,11 @@ def _parse_run(verb: str, rest: list[str]) -> argparse.Namespace:
         help="Include blast-radius report in JSON output (implies --json).",
     )
     ap.add_argument(
+        "--stats",
+        action="store_true",
+        help="Include a findings summary (total, per-rule, and for --all per-source).",
+    )
+    ap.add_argument(
         "--no-color",
         action="store_true",
         help="Disable ANSI colors/styling in human output "
@@ -580,6 +585,11 @@ def _get_completion_parser() -> argparse.ArgumentParser:
         help="Include blast-radius report in JSON output (implies --json).",
     )
     scan_p.add_argument(
+        "--stats",
+        action="store_true",
+        help="Include a findings summary (total, per-rule, and for --all per-source).",
+    )
+    scan_p.add_argument(
         "--no-color",
         action="store_true",
         help="Disable ANSI colors/styling in human output.",
@@ -642,6 +652,11 @@ def _get_completion_parser() -> argparse.ArgumentParser:
     )
     fix_p.add_argument(
         "--json", action="store_true", help="Emit findings as JSON to stdout."
+    )
+    fix_p.add_argument(
+        "--stats",
+        action="store_true",
+        help="Include a findings summary (total, per-rule, and for --all per-source).",
     )
     fix_p.add_argument(
         "--no-color",

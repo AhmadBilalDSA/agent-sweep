@@ -5,7 +5,9 @@ parses flags and hands the parsed namespace to run(); ui owns rendering.
 """
 from __future__ import annotations
 
+from collections import Counter
 import difflib
+from typing import TypeAlias, cast
 import json
 import os
 import sys
@@ -33,6 +35,10 @@ JSON_FLOOD_LIMIT = 30
 DEFAULT_JSON_NAME = "agentsweep-findings.json"
 DEFAULT_REPORT_NAME = "agentsweep-report.txt"
 
+JsonObject: TypeAlias = dict[str, object]
+JsonList: TypeAlias = list[JsonObject]
+JsonPayload: TypeAlias = JsonList | JsonObject
+
 
 def _opt(args, name: str, default=None):
     """Tolerate namespaces from older call sites that lack new fields."""
@@ -53,6 +59,10 @@ def run(args, *, _findings_out: list | None = None,
     output: Path | None = _opt(args, "output")
 
     as_sarif = _opt(args, "format") == "sarif"
+    if as_sarif and getattr(args, "stats", False):
+        print("error: --stats is not supported in SARIF mode; "
+              "omit --stats or use --json instead", file=sys.stderr)
+        return 2
     # Both machine formats share every no-banner/no-styling branch below; they
     # differ only in what an empty result set looks like on stdout.
     machine = bool(args.json) or as_sarif
@@ -94,11 +104,19 @@ def run(args, *, _findings_out: list | None = None,
         files = list(source.iter_files())
     if not files:
         print(f"No history files found under {source.root}", file=sys.stderr)
+        stats_flag = getattr(args, "stats", False)
         if machine:
-            _print_empty_machine_output()
+            if args.json and stats_flag:
+                empty_stats = _stats_payload({}, source_key=source.name)
+                _emit_json_payload(
+                    {"findings": [], "stats": empty_stats}, output, 0)
+            else:
+                _print_empty_machine_output()
         else:
             ui.stage(1, "warn", "DISCOVER", source.name,
                      f"no history files under {source.root}", err=True)
+            if stats_flag:
+                _show_stats(_stats_payload({}, source_key=source.name))
         return 0
 
     ignores = (ignore_mod.IgnoreSet() if _opt(args, "no_ignore")
@@ -129,6 +147,7 @@ def run(args, *, _findings_out: list | None = None,
             output,
             suppressed,
             report=getattr(args, "report", False),
+            stats=getattr(args, "stats", False),
         )
 
     ui.stage(1, "ok", "DISCOVER", source.name, f"{len(files)} file(s)", source.root)
@@ -157,6 +176,13 @@ def run(args, *, _findings_out: list | None = None,
 
     if not found_by_file:
         ui.stage(3, "ok", "FINDINGS", "no secrets found")
+        if getattr(args, "stats", False):
+            empty_stats = _stats_payload(found_by_file, source_key=source.name)
+            if output is not None:
+                _write_text(output, json.dumps(
+                    {"findings": [], "stats": empty_stats}, indent=2) + "\n")
+                print(f"0 finding(s) written to {output}", file=sys.stderr)
+            _show_stats(empty_stats)
         ui.stage(4, "skip", "REDACT", "nothing to redact")
         ui.stage(5, "skip", "ROTATE", "nothing to rotate")
         _warn_leftover_backups(source, as_json=False)
@@ -165,7 +191,11 @@ def run(args, *, _findings_out: list | None = None,
 
     total = sum(len(v) for v in found_by_file.values())
     ui.stage(3, "fail", "FINDINGS", f"{total} secret(s) in {len(found_by_file)} file(s)")
-    _show_findings(found_by_file, source, output)
+    stats_payload = (_stats_payload(found_by_file, source_key=source.name)
+                     if getattr(args, "stats", False) else None)
+    _show_findings(found_by_file, source, output, stats=stats_payload)
+    if stats_payload is not None:
+        _show_stats(stats_payload)
 
     if not args.fix:
         ui.stage(4, "skip", "REDACT",
@@ -318,6 +348,10 @@ def run_all(args) -> int:
     """
     output: Path | None = _opt(args, "output")
     as_sarif = _opt(args, "format") == "sarif"
+    if as_sarif and _opt(args, "stats", False):
+        print("error: --stats is not supported in SARIF mode; "
+              "omit --stats or use --json instead", file=sys.stderr)
+        return 2
     as_json = bool(_opt(args, "json", False)) or as_sarif
     report = getattr(args, "report", False)
     detected_only = bool(_opt(args, "detected", False))
@@ -343,11 +377,19 @@ def run_all(args) -> int:
         msg = ("no agent history roots found on this machine"
                if detected_only else "no sources available to scan")
         print(msg, file=sys.stderr)
+        stats_flag = _opt(args, "stats", False)
         if as_json:
-            print("[]")
+            if stats_flag:
+                _emit_json_payload(
+                    {"findings": [], "stats": _stats_payload_multi([])},
+                    output, 0)
+            else:
+                print("[]")
         else:
             ui.banner(__version__)
             ui.warn_line(msg)
+            if stats_flag:
+                _show_stats(_stats_payload_multi([]))
         return 0
 
     if not as_json:
@@ -434,13 +476,21 @@ def run_all(args) -> int:
 
     if total_files == 0:
         print("No history files found under any selected source", file=sys.stderr)
+        stats_flag = _opt(args, "stats", False)
         if as_json:
-            print("[]")
+            if stats_flag:
+                _emit_json_payload(
+                    {"findings": [], "stats": _stats_payload_multi([])},
+                    output, 0)
+            else:
+                print("[]")
         else:
             ui.stage(1, "warn", "DISCOVER", f"{len(selected)} source(s)",
                      "no history files", err=True)
             ui.stage(2, "skip", "SCAN", "nothing to scan")
             ui.stage(3, "ok", "FINDINGS", "no secrets found")
+            if stats_flag:
+                _show_stats(_stats_payload_multi([]))
             ui.stage(4, "skip", "REDACT", "nothing to redact")
             ui.stage(5, "skip", "ROTATE", "nothing to rotate")
             ui.contribute_line()
@@ -595,11 +645,24 @@ def run_all(args) -> int:
                                      as_json=True)
         if as_sarif:
             return _emit_sarif(payload, output, total_suppressed)
+        stats = _stats_payload_multi(per_source) if getattr(args, "stats", False) else None
         if report:
+            result: JsonObject = {
+                "findings": payload,
+                "blast_radius": blast_radius,
+            }
+            if stats is not None:
+                result["stats"] = stats
+            return _emit_json_payload(
+                result,
+                output,
+                total_suppressed,
+            )
+        if stats is not None:
             return _emit_json_payload(
                 {
                     "findings": payload,
-                    "blast_radius": blast_radius,
+                    "stats": stats,
                 },
                 output,
                 total_suppressed,
@@ -623,6 +686,13 @@ def run_all(args) -> int:
     dirty = [(k, s, fbf) for k, s, _files, fbf, _sc, _sup, _tr in per_source if fbf]
     if not dirty:
         ui.stage(3, "ok", "FINDINGS", "no secrets found")
+        if getattr(args, "stats", False):
+            empty_stats = _stats_payload_multi(per_source)
+            if output is not None:
+                _write_text(output, json.dumps(
+                    {"findings": [], "stats": empty_stats}, indent=2) + "\n")
+                print(f"0 finding(s) written to {output}", file=sys.stderr)
+            _show_stats(empty_stats)
         ui.stage(4, "skip", "REDACT", "nothing to redact")
         ui.stage(5, "skip", "ROTATE", "nothing to rotate")
         _warn_leftover_backups_multi([s for _k, s, *_ in per_source],
@@ -636,7 +706,7 @@ def run_all(args) -> int:
 
     # Display tables per source without writing the fixed overflow report
     # path (that would clobber across sources). One aggregated report after.
-    combined_payload: list[dict] = []
+    combined_payload: JsonList = []
     any_source_capped = False
     rows_shown = 0
     on_tty = ui.console.is_terminal
@@ -667,8 +737,15 @@ def run_all(args) -> int:
     # Single overflow destination: -o JSON if given, else one text report
     # that includes every source (never per-source clobber of DEFAULT_REPORT).
     needs_overflow = on_tty and (any_source_capped or grand > MAX_TABLE_ROWS)
+    stats_payload = _stats_payload_multi(per_source) if getattr(args, "stats", False) else None
     if output is not None:
-        _write_text(output, json.dumps(combined_payload, indent=2) + "\n")
+        output_payload: JsonPayload = combined_payload
+        if stats_payload is not None:
+            output_payload = {
+                "findings": combined_payload,
+                "stats": stats_payload,
+            }
+        _write_text(output, json.dumps(output_payload, indent=2) + "\n")
         ui.warn_line(f"{len(combined_payload)} finding(s) also written to {output}")
     elif needs_overflow:
         report = Path.cwd() / DEFAULT_REPORT_NAME
@@ -676,6 +753,9 @@ def run_all(args) -> int:
         ui.warn_line(
             f"full multi-source findings ({grand}) written to {report}"
         )
+
+    if stats_payload is not None:
+        _show_stats(stats_payload)
 
     if _opt(args, "fix", False):
         return _fix_all_sources(args, dirty)
@@ -1008,8 +1088,8 @@ def _group_findings(found_by_file: dict) -> dict:
 
     return groups
 
-def _json_payload(found_by_file: dict, source: Source) -> list[dict]:
-    payload = []
+def _json_payload(found_by_file: dict, source: Source) -> JsonList:
+    payload: JsonList = []
     for path, items in found_by_file.items():
         relpath = ui.rel(path, source.root)
         for line_num, keypath, _val, finding in items:
@@ -1024,6 +1104,57 @@ def _json_payload(found_by_file: dict, source: Source) -> list[dict]:
                 "masked": finding.masked,
             })
     return payload
+
+
+def _stats_payload(found_by_file: dict,
+                   source_key: str | None = None) -> JsonObject:
+    by_rule: Counter[str] = Counter()
+    total = 0
+    for items in found_by_file.values():
+        for _line_num, _keypath, _value, finding in items:
+            by_rule[finding.rule] += 1
+            total += 1
+    return {
+        "total_findings": total,
+        "by_rule": {rule: by_rule[rule] for rule in sorted(by_rule)},
+        "by_source": ({source_key: total} if (source_key and total) else {}),
+    }
+
+
+def _stats_payload_multi(
+    per_source: list[tuple[str, Source, list[Path], dict, int, int, list[Path]]]
+) -> JsonObject:
+    by_rule: Counter[str] = Counter()
+    by_source: Counter[str] = Counter()
+    total = 0
+
+    for key, _source, _files, found_by_file, _sc, _sup, _tr in per_source:
+        src_total = sum(len(items) for items in found_by_file.values())
+        if src_total:
+            by_source[key] += src_total
+        total += src_total
+        for items in found_by_file.values():
+            for _line_num, _keypath, _value, finding in items:
+                by_rule[finding.rule] += 1
+
+    return {
+        "total_findings": total,
+        "by_rule": {rule: by_rule[rule] for rule in sorted(by_rule)},
+        "by_source": {source: by_source[source] for source in sorted(by_source)},
+    }
+
+
+def _show_stats(stats: JsonObject) -> None:
+    ui.console.print("  Stats", style="bold cyan")
+    ui.console.print(f"    total findings: {stats['total_findings']}")
+    by_rule = stats["by_rule"]
+    if isinstance(by_rule, dict):
+        for rule, count in by_rule.items():
+            ui.console.print(f"    rule:{rule}  {count}")
+    by_source = stats.get("by_source")
+    if isinstance(by_source, dict):
+        for source, count in by_source.items():
+            ui.console.print(f"    source:{source}  {count}")
 
 
 SARIF_SCHEMA = (
@@ -1134,11 +1265,11 @@ def _emit_sarif(payload: list[dict], output: Path | None,
     return code
 
 
-def _emit_json_payload(payload, output: Path | None,
+def _emit_json_payload(payload: JsonPayload, output: Path | None,
                        suppressed: int) -> int:
     """Shared JSON emission for single- and multi-source scans."""
 
-    findings = payload["findings"] if isinstance(payload, dict) else payload
+    findings: JsonList = cast(JsonList, payload["findings"]) if isinstance(payload, dict) else payload
     count = len(findings)
     code = 0 if count == 0 else 1
 
@@ -1175,16 +1306,31 @@ def _output_json(
     output: Path | None,
     suppressed: int,
     report: bool = False,
+    stats: bool = False,
 ) -> int:
     """Emit JSON output, optionally including a blast-radius report."""
 
     findings = _json_payload(found_by_file, source)
+    stats_payload = _stats_payload(found_by_file, source_key=source.name) if stats else None
 
     if report:
+        payload: JsonObject = {
+            "findings": findings,
+            "blast_radius": _blast_radius_payload(found_by_file),
+        }
+        if stats_payload is not None:
+            payload["stats"] = stats_payload
+        return _emit_json_payload(
+            payload,
+            output,
+            suppressed,
+        )
+
+    if stats_payload is not None:
         return _emit_json_payload(
             {
                 "findings": findings,
-                "blast_radius": _blast_radius_payload(found_by_file),
+                "stats": stats_payload,
             },
             output,
             suppressed,
@@ -1194,7 +1340,7 @@ def _output_json(
 
 
 def _show_findings(found_by_file: dict, source: Source,
-                   output: Path | None) -> None:
+                   output: Path | None, *, stats: JsonObject | None = None) -> None:
     """Human findings table — capped on a real terminal so a huge scan can't
     bury the screen; the full set always goes to a report file in that case
     (or to -o if given)."""
@@ -1203,7 +1349,14 @@ def _show_findings(found_by_file: dict, source: Source,
     capped = on_tty and len(rows) > MAX_TABLE_ROWS
 
     if output is not None:
-        _write_text(output, json.dumps(_json_payload(found_by_file, source),
+        findings = _json_payload(found_by_file, source)
+        output_payload: JsonPayload = findings
+        if stats is not None:
+            output_payload = {
+                "findings": findings,
+                "stats": stats,
+            }
+        _write_text(output, json.dumps(output_payload,
                                        indent=2) + "\n")
 
     if capped:
