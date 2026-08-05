@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Add a `list-sources` command with machine-readable and detected-source output.
+- Add multi-source `scan --all` and guided `fix --all`, including `--detected`.
+- Add Datasette `llm` and Crush history sources, and honor `CLAUDE_CONFIG_DIR` for Claude profile roots.
+- Add command completion for Bash, Zsh, Fish, and PowerShell.
+- Add `explain <rule-id>` and `explain --list` for redaction rules.
+- Add repeatable `--only-rule` and `--exclude-rule` rule filtering.
+- Add SARIF 2.1.0 scan output.
+- Add JSON blast-radius reporting through `--report`.
+- Add finding rollups through `--stats`.
+- Add custom validated redaction markers through `fix --redact-with`.
+- Add persistent safe TOML defaults with CLI precedence, and warn about and ignore safety-gating flags from config files.
+- Add `--no-color` and `NO_COLOR` support across human output and update notices, treating `FORCE_COLOR=0` as not forcing color.
+- Add secret detectors for Google OAuth and service-account credentials, Cohere, DeepSeek, Fireworks AI, Groq, Mistral AI, OpenRouter, Together AI, xAI/Grok, and Docker Hub personal-access tokens.
+- Add a non-root Docker image, a pre-commit hook, and a Unix man page.
+- Flash the live scan finding count when new secrets are detected.
+
+### Changed
+
+- Run all-source discovery and scanning concurrently while retaining deterministic output.
+- Reduce `--version` startup work by avoiding source, UI, completion, and update-network imports.
+
+### Fixed
+
+- Scan current OpenCode SQLite schemas and fail loudly when a known table has none of its expected text columns.
+- Bound Aider discovery by pruning cache and vendor trees, while retaining `.config` histories and warning when the 12-level depth cap requires `--root`.
+- Preserve CRLF line endings during redaction.
+
+### Security
+
+- Prevent SQLite WAL/SHM sidecars from retaining or replaying plaintext after redaction, and include sidecar backups in undo and purge.
+- Warn that leftover `.bak` files may still retain plaintext secrets.
+- Quote dynamic SQLite identifiers throughout scanning and redaction.
+- Harden repository and release automation with least-privilege permissions, immutable Action pins, CodeQL, and OpenSSF Scorecard.
+
 ## [0.1.9] - 2026-06-13
 
 ### Fixed
