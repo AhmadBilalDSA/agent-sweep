@@ -17,18 +17,24 @@ No API token or secret is required — PyPI authenticates via OIDC from the work
 
 ## Per-release steps
 
-1. Bump the version in two places:
+1. Update `CHANGELOG.md`:
+   - Ensure every notable change since the previous release appears under `## [Unreleased]` using the standard Keep a Changelog categories.
+   - Move those entries under a new `## [X.Y.Z] - YYYY-MM-DD` heading, leaving a fresh empty `## [Unreleased]` section above it.
+   - Update `[Unreleased]` to compare `vX.Y.Z...HEAD`.
+   - Add `[X.Y.Z]` comparing `vPREV...vX.Y.Z`.
+
+2. Bump the version in two places:
    - `pyproject.toml` — the `version = "X.Y.Z"` field
    - `src/agentsweep/__init__.py` — the `__version__ = "X.Y.Z"` string
 
-2. Commit the version bump:
-   ```
-   git add pyproject.toml src/agentsweep/__init__.py
-   git commit -m "chore: bump version to X.Y.Z"
+3. Commit the version bump and changelog together:
+   ```shell
+   git add CHANGELOG.md pyproject.toml src/agentsweep/__init__.py
+   git commit -m "chore: bump version to X.Y.Z and update CHANGELOG"
    ```
 
-3. Tag and push:
-   ```
+4. Tag and push:
+   ```shell
    git tag vX.Y.Z
    git push origin main --tags
    ```
