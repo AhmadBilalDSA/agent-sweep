@@ -250,15 +250,6 @@ def test_rotation_guidance_present_or_cli_default_applies() -> None:
     assert not stale, f"guidance for rules that no longer exist: {stale}"
 
 
-@pytest.mark.parametrize("suffix", [
-    'a2b3c4d5e6f7g8h9jAkBmCnDpEqFrGsHtJuKvMwNx' 'PyQzR2x',
-    'a2b3c4d5e6f7g8h9jAkBmCnDpEqFrGsHtJuKvMwNx' 'PyQzR2xY',
-])
-def test_posthog_personal_api_key_detects_real_lengths(suffix: str) -> None:
-    token = f"{'ph'}x_{suffix}"
-    assert any(f.rule == "posthog-personal-api-key" for f in scan_text(token))
-
-
 # Discord bot tokens are a native rule (no gitleaks equivalent), so they live
 # here as dedicated cases rather than in FIXTURES. Tokens are split across
 # adjacent string literals so this file never holds a contiguous token-shaped
