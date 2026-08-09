@@ -104,6 +104,14 @@ class TestIgnoreSetAddLine:
         ig = IgnoreSet()
         ig.add_line("rule: aws-access-key ")
         assert "aws-access-key" in ig.rules
+        
+    def test_path_prefix_goes_to_globs(self):
+        ig = IgnoreSet()
+        ig.add_line("path:*/fixtures/*")
+        assert "*/fixtures/*" in ig.globs
+        assert not ig.rules
+        assert not ig.fingerprints
+        assert not ig.values
 
     def test_fingerprint_pattern_goes_to_fingerprints(self):
         ig = IgnoreSet()
@@ -149,6 +157,20 @@ class TestIgnoreSetAddLine:
         ig = IgnoreSet()
         ig.add_line(AWS_KEY)
         assert ig
+        
+    def test_bool_true_when_has_glob(self):
+        ig = IgnoreSet()
+        ig.add_line("path:*/fixtures/*")
+        assert ig
+        
+    def test_file_named_path_is_classified_as_fingerprint(self):
+        ig = IgnoreSet()
+        ig.add_line("path:1:aws-access-key")
+
+        assert "path:1:aws-access-key" in ig.fingerprints
+        assert not ig.globs
+        assert not ig.rules
+        assert not ig.values
 
 
 class TestIgnoreSetMatches:
@@ -179,6 +201,38 @@ class TestIgnoreSetMatches:
         # does NOT match a different secret value
         assert not ig.matches("aws-access-key", "AKIAOTHER12345678901", "f:1:aws-access-key")
 
+    def test_path_glob_matches_relpath(self):
+        ig = IgnoreSet()
+        ig.add_line("path:*/fixtures/*")
+        assert ig.matches(
+            "aws-access-key",
+            AWS_KEY,
+            "tests/fixtures/sample.jsonl:1:aws-access-key",
+            "tests/fixtures/sample.jsonl",
+        )
+        
+    def test_path_glob_matches_windows_separators(self):
+        ig = IgnoreSet()
+        ig.add_line("path:*/fixtures/*")
+
+        assert ig.matches(
+            "aws-access-key",
+            AWS_KEY,
+            r"tests\fixtures\sample.jsonl:1:aws-access-key",
+            r"tests\fixtures\sample.jsonl",
+        )
+        
+    def test_path_glob_does_not_match_other_paths(self):
+        ig = IgnoreSet()
+        ig.add_line("path:*/fixtures/*")
+
+        assert not ig.matches(
+            "aws-access-key",
+            AWS_KEY,
+            "tests/other/sample.jsonl:1:aws-access-key",
+            "tests/other/sample.jsonl",
+        )
+    
     def test_no_match_returns_false(self):
         ig = IgnoreSet()
         ig.add_line("rule:aws-access-key")
@@ -310,6 +364,36 @@ class TestFingerprintSuppression:
         assert "1" in err2 and "suppressed" in err2
 
 
+class TestPathGlobSuppression:
+    """path:<pattern> suppresses findings based on their relative file path."""
+
+    def test_path_glob_suppresses_matching_file(self, tmp_path, capsys):
+        root = _mkroot(tmp_path, _AWS_ONLY_LINE)
+        (root / IGNORE_FILENAME).write_text(
+            "path:*.jsonl\n",
+            encoding="utf-8",
+        )
+
+        code, payload, err = _scan_json(root, capsys=capsys)
+
+        assert code == 0
+        assert payload == []
+        assert "1" in err and "suppressed" in err
+
+    def test_path_glob_does_not_suppress_non_matching_file(self, tmp_path, capsys):
+        root = _mkroot(tmp_path, _AWS_ONLY_LINE)
+        (root / IGNORE_FILENAME).write_text(
+            "path:*.txt\n",
+            encoding="utf-8",
+        )
+
+        code, payload, err = _scan_json(root, capsys=capsys)
+
+        assert code == 1
+        assert any(f["rule"] == "aws-access-key" for f in payload)
+        assert "suppressed" not in err
+        
+        
 class TestLiteralValueSuppression:
     """A bare literal value line suppresses any finding whose secret matches."""
 
