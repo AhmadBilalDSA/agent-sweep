@@ -949,7 +949,7 @@ def _scan_file(
                 continue
             if ignores:
                 fp = ignore_mod.fingerprint(relpath, line_num, finding.rule)
-                if ignores.matches(finding.rule, finding.value, fp):
+                if ignores.matches(finding.rule, finding.value, fp, relpath):
                     suppressed += 1
                     continue
             items.append((line_num, keypath, value, finding))
