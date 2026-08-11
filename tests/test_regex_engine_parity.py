@@ -32,6 +32,8 @@ def _core_fixtures() -> dict[str, str]:
         "slack-user": "xoxp-" + "a" * 10,
         "slack-webhook": "https://hooks.slack.com/services/T000/B000/abcdefgh",
         "huggingface": "hf_" + "a" * 34,
+        "supabase-access-token": "sbp_" + "a1" * 20,
+        "supabase-secret-key": "sb_secret_" + "a1" * 11 + "_" + "b2" * 4,
         "jwt": "eyJ" + "a" * 10 + ".eyJ" + "b" * 10 + "." + "c" * 10,
         "private-key-pem": (
             "-----BEGIN PRIVATE KEY-----\nsynthetic-body\n-----END PRIVATE KEY-----"
