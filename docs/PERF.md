@@ -1,6 +1,6 @@
 # Scanner performance notes
 
-Detection runs 205 regexes + a BIP-39 mnemonic check over every string
+Detection runs 206 regexes + a BIP-39 mnemonic check over every string
 value in every JSONL line. History sizes are large (900+ files, some with
 multi-MB embedded transcripts), so per-byte and per-string costs both matter.
 
@@ -8,7 +8,7 @@ multi-MB embedded transcripts), so per-byte and per-string costs both matter.
 
 - **Keyword pre-filter (approx 7.5x).** Each rule carries a required literal
   anchor (`akia`, `ghp_`, `twitter`, ...) extracted from its pattern; the
-  regex is skipped when the anchor is absent. 199/205 rules are gated.
+  regex is skipped when the anchor is absent. 200/206 rules are gated.
   Provably lossless (a match always contains its anchor); gated by the
   per-rule fixture tests. See `scanner.py:_prefilter_literals`.
 - **Mnemonic gate.** `detect_mnemonics` returns early when a string has
@@ -18,8 +18,8 @@ multi-MB embedded transcripts), so per-byte and per-string costs both matter.
   prefilter checks into one O(n) pass (substring fallback if the wheel is
   absent). See `scanner.py:_triggered_indices`.
 - **Optional mixed RE2 engine.** `pip install 'agentsweep[fast]'` enables
-  `google-re2` for the rules it can compile; the current registry selects 144
-  RE2 rules and keeps 58 Python-`re` fallbacks with explicit audit reasons.
+  `google-re2` for the rules it can compile; the current registry selects 145
+  RE2 rules and keeps 61 Python-`re` fallbacks with explicit audit reasons.
   Missing wheels leave the default install fully functional on stdlib. Python
   `re` remains the semantic oracle for non-ASCII Unicode-sensitive rules, for
   short strings, and for a rule with more than four matches, where the RE2
@@ -46,7 +46,7 @@ multi-MB embedded transcripts), so per-byte and per-string costs both matter.
 ## Evaluated and dropped
 
 - **multiprocessing across files.** On Windows `spawn` re-imports modules
-  and recompiles all 205 regexes per worker; measured ~1.1× on a 2.4 MB /
+  and recompiles all 206 regexes per worker; measured ~1.1× on a 2.4 MB /
   200-file corpus (startup cost dominates), with one run at 0.4×. It also
   risks a re-import fork bomb if an entry point isn't `__main__`-guarded.
   Not worth the risk/complexity for the gain. (Cheap, shared-memory
