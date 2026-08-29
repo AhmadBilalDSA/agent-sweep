@@ -19,3 +19,5 @@ secret:
       match: "ghp_1234567890abcdefghijklmnopqrstuvwxyz"
     - name: "Neon role-password prefix anchor (detection-rule literal, not a real secret)"
       match: "npg_"
+    - name: "Tavily API-key prefix anchor (detection-rule literal, not a real secret)"
+      match: "tvly-"

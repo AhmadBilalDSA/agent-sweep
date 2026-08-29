@@ -42,3 +42,19 @@ def test_neon_role_password_length_is_bounded():
 )
 def test_neon_role_password_rejects_word_and_dash_embeds(embedded: str):
     assert scan_text(embedded) == []
+
+
+def test_neon_role_password_redaction_replaces_the_exposed_span():
+    from agentsweep.pipeline import _build_redactions
+
+    password = _password()
+    value = "PGPASSWORD=" + password
+    findings = scan_text(value)
+    assert findings, "fixture must produce a finding"
+
+    items = [(1, [], value, f) for f in findings]
+    [(_line, _kp, new_value)] = _build_redactions(items)
+
+    assert password not in new_value
+    assert "[REDACTED:neon-role-password]" in new_value
+    assert new_value == "PGPASSWORD=[REDACTED:neon-role-password]"
