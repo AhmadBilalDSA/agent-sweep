@@ -13,10 +13,12 @@ from agentsweep.scanner import ROTATION_GUIDANCE, scan_text  # noqa: E402
 
 
 def _key(body_length: int = 40) -> str:
+    """Generate a synthetic Tavily API key string with the specified body length."""
     return "tvly-" + "A" * body_length
 
 
 def test_detects_tavily_api_key_and_includes_rotation_guidance():
+    """Verify standard Tavily API key detection and presence of rotation instructions."""
     findings = scan_text(_key())
 
     assert [finding.rule for finding in findings] == ["tavily-api-key"]
@@ -25,6 +27,7 @@ def test_detects_tavily_api_key_and_includes_rotation_guidance():
 
 
 def test_tavily_api_key_length_is_bounded():
+    """Verify that Tavily keys outside the exact 40-character body boundary are ignored."""
     assert scan_text(_key(39)) == []
     assert scan_text(_key(41)) == []
 
@@ -39,10 +42,12 @@ def test_tavily_api_key_length_is_bounded():
     ],
 )
 def test_tavily_api_key_rejects_word_and_dash_embeds(embedded: str):
+    """Verify that boundary characters like adjacent words or dashes prevent false matches."""
     assert scan_text(embedded) == []
 
 
 def test_tavily_api_key_redaction_replaces_the_exposed_span():
+    """Verify that detected Tavily API keys are correctly replaced by the redaction marker."""
     from agentsweep.pipeline import _build_redactions
 
     key = _key()
